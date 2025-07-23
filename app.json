@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "ido10s",
+    "slug": "ido10s",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "ido10s",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tonyesgo.ido10s"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "router": {
+      "origin": "expo"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5636cd3b-92a7-4f0b-8948-c95d3176e411"
+      }
+    },
+    "owner": "tonyesgo"
+  }
+}
