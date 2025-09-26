@@ -1,7 +1,8 @@
+import MapView, { Marker, PROVIDER_GOOGLE } from '@/components/Map';
 import Colors from '@/constants/Colors';
 import { app } from '@/firebaseConfig';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import {
   collection,
   doc,
@@ -9,8 +10,10 @@ import {
   getDocs,
   getFirestore,
 } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Image,
+  Modal,
   Platform,
   RefreshControl,
   SafeAreaView,
@@ -19,37 +22,64 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
-
 
 const db = getFirestore(app);
+
+// --- Definición de tipo para markers del mapa web ---
+type BarMarker = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  promotion?: any;
+  location?: string;
+  icon?: string;
+};
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
 
   const [search, setSearch] = useState('');
+  const [filterSport, setFilterSport] = useState<string | null>(null);
+  const [filterLeague, setFilterLeague] = useState<string | null>(null);
+  const [filterDate, setFilterDate] = useState<string | null>(null);
+  const [filterMunicipality, setFilterMunicipality] = useState<string | null>(null);
+
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [matches, setMatches] = useState<any[]>([]);
   const [bars, setBars] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [filteredBars, setFilteredBars] = useState<any[]>([]);
+  const [selectedBar, setSelectedBar] = useState<any | null>(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Obtener partidos
       const matchesSnap = await getDocs(collection(db, 'matches'));
-      const matchesData = matchesSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const now = new Date();
+
+      const matchesData = matchesSnap.docs
+        .map((doc) => {
+          const data = doc.data() as {
+            date?: any;
+            teams?: string;
+            sport?: string;
+            league?: string;
+          };
+          return { id: doc.id, ...data };
+        })
+        .filter((match) => {
+          const matchDate = match.date?.toDate?.();
+          return matchDate instanceof Date && matchDate >= now;
+        });
+
       setMatches(matchesData);
 
-      // Obtener bares
       const barsSnap = await getDocs(collection(db, 'bars'));
       const barsData = barsSnap.docs.map((doc) => ({
         id: doc.id,
@@ -62,104 +92,229 @@ export default function HomeScreen() {
       setLoading(false);
     }
   };
-<Stack.Screen options={{ headerShown: false }} />
-
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadPromos = async () => {
+      if (!selectedMatch) {
+        if (mounted) setFilteredBars([]);
+        return;
+      }
+      try {
+        const list = await getPromotionsForMatch(selectedMatch);
+        if (mounted) setFilteredBars(list);
+      } catch (e) {
+        console.log('loadPromos error:', e);
+        if (mounted) setFilteredBars([]);
+      }
+    };
+    loadPromos();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedMatch, bars]);
+
   const getPromotionsForMatch = async (match: any) => {
-    const barList = match.broadcastBars || [];
+    const barList = Array.isArray(match?.broadcastBars) ? match.broadcastBars : [];
+    const results: any[] = [];
+    for (const bar of barList) {
+      try {
+        const barDoc = bars.find((b) => b.id === bar?.barId);
+        if (!barDoc) continue;
 
-    const barsWithPromos = await Promise.all(
-      barList.map(async (bar: any) => {
-        const barDoc = bars.find((b) => b.id === bar.barId);
-        if (!barDoc) return null;
-
-        let promoData = null;
-        if (bar.promotionId) {
-          const promoRef = doc(
-            db,
-            'bars',
-            bar.barId,
-            'defaultPromotions',
-            bar.promotionId
-          );
-          const promoSnap = await getDoc(promoRef);
-          if (promoSnap.exists()) {
-            promoData = promoSnap.data();
+        let promoData: any = null;
+        if (bar?.promotionId) {
+          try {
+            const promoRef = doc(
+              db,
+              'bars',
+              String(bar.barId),
+              'defaultPromotions',
+              String(bar.promotionId)
+            );
+            const promoSnap = await getDoc(promoRef);
+            if (promoSnap.exists()) promoData = promoSnap.data();
+          } catch (e) {
+            console.log('Promo fetch error:', e);
           }
         }
 
-        return {
+        results.push({
           ...barDoc,
-          capacity: bar.capacity,
+          capacity: bar?.capacity ?? null,
           promotion: promoData,
-        };
-      })
-    );
-
-    return barsWithPromos.filter(Boolean);
+        });
+      } catch (e) {
+        console.log('Bar processing error:', e);
+      }
+    }
+    return results;
   };
 
-  const [filteredBars, setFilteredBars] = useState<any[]>([]);
-
-  useEffect(() => {
-    const loadPromos = async () => {
-      if (!selectedMatch) {
-        setFilteredBars([]);
-        return;
-      }
-
-      const bars = await getPromotionsForMatch(selectedMatch);
-      setFilteredBars(bars);
-    };
-
-    loadPromos();
-  }, [selectedMatch]);
-
-  const filteredMatches = matches.filter((match) =>
-    match.teams?.toLowerCase().includes(search.toLowerCase())
+  // --- Deportes y ligas dinámicos ---
+  const sportsFromMatches = useMemo(
+    () => Array.from(new Set(matches.map((m) => m.sport))).filter(Boolean),
+    [matches]
   );
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.tabBackground }]}>
-      <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: 5 }]}
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchData} />
-        }
-      >
-        <Text style={[styles.appTitle, { color: theme.tabBarActiveTintColor }]}>
-          IDO10S
-        </Text>
+  const leaguesFromMatches = (sport: string) =>
+    Array.from(new Set(matches.filter((m) => m.sport === sport).map((m) => m.league)))
+      .filter(Boolean);
 
-        <Text style={[styles.title, { color: theme.text }]}>¿Qué partido quieres ver?</Text>
+  // --- Municipios dinámicos ---
+  const municipalitiesFromBars = useMemo(
+    () =>
+      Array.from(
+        new Set(filteredBars.map((b) => b.address?.municipality?.trim()))
+      ).filter(Boolean),
+    [filteredBars]
+  );
+
+  const filteredBarsByMunicipality = useMemo(() => {
+    if (!filterMunicipality) return filteredBars;
+    return filteredBars.filter(
+      (b) =>
+        b.address?.municipality?.toLowerCase().trim() ===
+        filterMunicipality.toLowerCase().trim()
+    );
+  }, [filteredBars, filterMunicipality]);
+
+  const filteredMatches = matches.filter((match) => {
+    let ok = true;
+    if (search && !match.teams?.toLowerCase().includes(search.toLowerCase())) ok = false;
+    if (filterSport && match.sport?.toLowerCase() !== filterSport.toLowerCase()) ok = false;
+    if (filterLeague && match.league !== filterLeague) ok = false;
+    if (filterDate && match.date?.toDate) {
+      const matchDate = match.date.toDate();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (filterDate === "hoy" && matchDate.toDateString() !== today.toDateString()) ok = false;
+      if (filterDate === "mañana") {
+        const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+        if (matchDate.toDateString() !== tomorrow.toDateString()) ok = false;
+      }
+      if (filterDate === "fin") {
+        const day = matchDate.getDay();
+        if (![5,6,0].includes(day)) ok = false;
+      }
+      if (filterDate === "7dias") {
+        const week = new Date(today); week.setDate(today.getDate() + 7);
+        if (matchDate < today || matchDate > week) ok = false;
+      }
+    }
+    return ok;
+  });
+
+  const DATES = ["hoy", "mañana", "fin", "7dias"];
+
+  return (
+  <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
+      contentContainerStyle={[styles.container, { paddingBottom: 20 }]}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
+    >
+      {/* 👇 Logo Seatly completo */}
+      <View style={{ alignItems: "center", marginBottom: 20 }}>
+        <Image
+          source={require("../../public/seatly-full.png")} // 👈 ajusta la ruta según tu estructura
+          style={{ width: 160, height: 80 }} // ajusta tamaño a tu gusto
+          resizeMode="contain"
+        />
+      </View>
+
+        {/* Buscador */}
         <TextInput
-          style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, fontFamily: 'Montserrat-Black' }]}
+          style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
           placeholder="Buscar partido (ej. Tigres vs Rayados)"
           placeholderTextColor="#999"
           value={search}
           onChangeText={setSearch}
         />
 
+        {/* --- Filtros deportes --- */}
+        <Text style={styles.filterTitle}>FILTRAR POR DEPORTE</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ flexDirection: "row", marginBottom: 10 }}>
+            {sportsFromMatches.map((s) => (
+              <TouchableOpacity
+                key={s}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: filterSport === s ? theme.tabBarActiveTintColor : "#F2F2F2",
+                    borderColor: filterSport === s ? theme.tabBarActiveTintColor : "#DDD",
+                  },
+                ]}
+                onPress={() => { setFilterSport(filterSport === s ? null : s); setFilterLeague(null); }}
+              >
+                <Text style={{ color: filterSport === s ? "#FFF" : "#333" }}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* --- Filtros liga --- */}
+        {filterSport && (
+          <>
+            <Text style={styles.filterTitle}>FILTRAR POR LIGA</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", marginBottom: 10 }}>
+                {leaguesFromMatches(filterSport).map((l) => (
+                  <TouchableOpacity
+                    key={l}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: filterLeague === l ? theme.tabBarActiveTintColor : "#F2F2F2",
+                        borderColor: filterLeague === l ? theme.tabBarActiveTintColor : "#DDD",
+                      },
+                    ]}
+                    onPress={() => setFilterLeague(filterLeague === l ? null : l)}
+                  >
+                    <Text style={{ color: filterLeague === l ? "#FFF" : "#333" }}>{l}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </>
+        )}
+
+        {/* --- Filtros fecha --- */}
+        <Text style={styles.filterTitle}>FILTRAR POR FECHA</Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 10 }}>
+          {DATES.map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: filterDate === d ? theme.tabBarActiveTintColor : "#F2F2F2",
+                  borderColor: filterDate === d ? theme.tabBarActiveTintColor : "#DDD",
+                },
+              ]}
+              onPress={() => setFilterDate(filterDate === d ? null : d)}
+            >
+              <Text style={{ color: filterDate === d ? "#FFF" : "#333" }}>{d.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* --- Lista de partidos --- */}
         {filteredMatches.map((match) => {
           let readableDate = '';
           try {
             if (match.date?.toDate) {
               readableDate = match.date.toDate().toLocaleString('es-MX', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
+                weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
               });
             }
-          } catch (err) {
-            console.warn('Error al formatear la fecha', err);
-          }
-
+          } catch {}
           return (
             <TouchableOpacity
               key={match.id}
@@ -169,162 +324,262 @@ export default function HomeScreen() {
               ]}
               onPress={() => setSelectedMatch(match)}
             >
-              <Text style={[styles.cardTitle, { color: theme.text }]}>{match.teams}</Text>
-              <Text style={[styles.cardDate, { color: '#666' }]}>{readableDate}</Text>
+              <Text style={styles.cardTitle}>{match.teams}</Text>
+              <Text style={styles.cardDate}>{readableDate}</Text>
+              {(match.sport || match.league) && (
+                <Text style={{ fontSize: 13, color: "#999" }}>
+                  {match.sport} {match.league ? `· ${match.league}` : ""}
+                </Text>
+              )}
             </TouchableOpacity>
           );
         })}
 
+        {/* --- Lista de bares + filtro municipio --- */}
         {selectedMatch && (
           <View style={styles.barsContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Bares que transmiten:
-            </Text>
-            <Text style={[{ marginBottom: 10, color: theme.text, fontFamily: 'Montserrat-Black' }]}>
-              Mostrando {filteredBars.length} bares
-            </Text>
+            <Text style={styles.sectionTitle}>Bares que transmiten:</Text>
 
-            {filteredBars.length > 0 ? (
-              <>
-                {filteredBars.map((bar) => (
-                  <View key={bar.id} style={[styles.card, { backgroundColor: theme.tabBackground }]}>
-                    <Text style={[styles.cardTitle, { color: theme.text }]}>{bar.name}</Text>
-                    <Text style={[styles.cardDate, { color: '#666' }]}>{bar.location}</Text>
-                    {bar.promotion && (
-  <>
-    <Text style={[styles.cardDate, { color: theme.tabBarActiveTintColor }]}>
-      💵 ${bar.promotion.price}
-    </Text>
-    <Text style={[styles.cardDate, { color: theme.tabBarActiveTintColor }]}>
-      🧾 {bar.promotion.included}
-    </Text>
-  </>
-)}
-
-                    <TouchableOpacity
-                      style={[styles.reserveButton, { backgroundColor: theme.button }]}
-                      onPress={() =>
-                        router.push(`/reserve?barId=${bar.id}&matchId=${selectedMatch.id}`)
-                      }
-                    >
-                      <Text style={[styles.reserveButtonText, { color: theme.buttonText }]}>
-                        Reservar mesa
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-
-                <Text style={[styles.sectionTitle, { marginTop: 30, color: theme.text }]}>
-                  Mapa de bares
-                </Text>
-                <View style={{ marginBottom: 140 }}>
-                  <MapView
-                    style={styles.map}
-                    initialRegion={{
-                      latitude: Number(filteredBars[0]?.lat) || 25.6866,
-                      longitude: Number(filteredBars[0]?.lng) || -100.3161,
-                      latitudeDelta: 0.05,
-                      longitudeDelta: 0.05,
-                    }}
+            {/* Filtro municipios */}
+            {municipalitiesFromBars.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", marginBottom: 10 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: !filterMunicipality ? theme.tabBarActiveTintColor : "#F2F2F2",
+                        borderColor: !filterMunicipality ? theme.tabBarActiveTintColor : "#DDD",
+                      },
+                    ]}
+                    onPress={() => setFilterMunicipality(null)}
                   >
-                    {filteredBars.map((bar) => {
-                      const lat = Number(bar.lat);
-                      const lng = Number(bar.lng);
-
-                      if (isNaN(lat) || isNaN(lng)) return null;
-
-                      return (
-                        <Marker
-                          key={bar.id}
-                          coordinate={{
-                            latitude: lat,
-                            longitude: lng,
-                          }}
-                          title={bar.name}
-                          description={bar.location}
-                        />
-                      );
-                    })}
-                  </MapView>
+                    <Text style={{ color: !filterMunicipality ? "#FFF" : "#333" }}>Todos</Text>
+                  </TouchableOpacity>
+                  {municipalitiesFromBars.map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: filterMunicipality === m ? theme.tabBarActiveTintColor : "#F2F2F2",
+                          borderColor: filterMunicipality === m ? theme.tabBarActiveTintColor : "#DDD",
+                        },
+                      ]}
+                      onPress={() => setFilterMunicipality(filterMunicipality === m ? null : m)}
+                    >
+                      <Text style={{ color: filterMunicipality === m ? "#FFF" : "#333" }}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </>
-            ) : (
-              <Text style={[styles.noBars, { color: theme.text }]}>
-                No hay bares registrados para este partido.
-              </Text>
+              </ScrollView>
             )}
+
+            <Text style={{ marginBottom: 10 }}>
+              Mostrando {filteredBarsByMunicipality.length} bares
+            </Text>
+
+            {filteredBarsByMunicipality.map((bar) => (
+              <View key={bar.id} style={[styles.card, { backgroundColor: theme.tabBackground }]}>
+                <Text style={styles.cardTitle}>{bar.name}</Text>
+                <Text style={styles.cardDate}>{bar.location}</Text>
+                {bar.promotion && (
+                  <>
+                    <Text style={{ marginTop: 4, color: '#D7A048' }}>
+                      Promo: ${bar.promotion.price}
+                    </Text>
+                    {bar.promotion.included && (
+                      <Text style={{ fontSize: 12, color: '#666' }}>
+                        {bar.promotion.included}
+                      </Text>
+                    )}
+                  </>
+                )}
+
+                {/* Botones */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity
+                    style={{ flex: 0.6, paddingVertical: 10, borderRadius: 8, backgroundColor: '#EEE', alignItems: 'center' }}
+                    onPress={() => router.push(`/bar/${bar.id}?matchId=${selectedMatch.id}`)}
+                  >
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: '#333' }}>
+                      Más info
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: theme.tabBarActiveTintColor, alignItems: 'center' }}
+                    onPress={() => router.push(`/reserve?barId=${bar.id}&matchId=${selectedMatch.id}`)}
+                  >
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.background }}>
+                      Reservar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+
+            {/* --- Mapa --- */}
+            <Text style={styles.sectionTitle}>Mapa de bares</Text>
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={{ width: '100%', height: 400, borderRadius: 10, marginBottom: 20 }}
+              initialRegion={{
+                latitude: Number(filteredBarsByMunicipality[0]?.coordinates?.lat ?? 25.6866),
+                longitude: Number(filteredBarsByMunicipality[0]?.coordinates?.lng ?? -100.3161),
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+              latitude={Number(filteredBarsByMunicipality[0]?.coordinates?.lat ?? 25.6866)}
+              longitude={Number(filteredBarsByMunicipality[0]?.coordinates?.lng ?? -100.3161)}
+              zoom={14}
+              height={400}
+              markers={filteredBarsByMunicipality
+                .filter((bar) => bar.coordinates?.lat && bar.coordinates?.lng)
+                .map((bar): BarMarker => ({
+                  id: bar.id,
+                  name: bar.name,
+                  lat: Number(bar.coordinates.lat),
+                  lng: Number(bar.coordinates.lng),
+                  promotion: bar.promotion,
+                  location: bar.location,
+                  icon: "/assets/images/icon.png",
+                }))}
+              onMarkerClick={(bar: BarMarker) => setSelectedBar(bar)} // 👈 corregido
+            >
+              {/* Markers personalizados SOLO en móvil */}
+              {filteredBarsByMunicipality.map((bar: any) => {
+                const lat = Number(bar.coordinates?.lat ?? bar.lat);
+                const lng = Number(bar.coordinates?.lng ?? bar.lng);
+                if (isNaN(lat) || isNaN(lng)) return null;
+
+                return (
+                  <Marker
+                    key={bar.id}
+                    coordinate={{ latitude: lat, longitude: lng }}
+                    anchor={{ x: 0.5, y: 1 }}
+                    onPress={() => setSelectedBar(bar)}
+                  >
+                    <View style={{ alignItems: "center" }}>
+                      <View
+                        style={{
+                          width: 50,
+                          height: 50,
+                          backgroundColor: "#1B1D36",
+                          borderRadius: 25,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          borderWidth: 2,
+                          borderColor: "#fff",
+                        }}
+                      >
+                        <Image
+                          source={require("@/assets/images/icon.png")}
+                          style={{ width: 28, height: 28 }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                    </View>
+                  </Marker>
+                );
+              })}
+            </MapView>
+
           </View>
         )}
       </ScrollView>
+
+      {/* --- Modal del bar --- */}
+      <Modal
+        visible={!!selectedBar}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedBar(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {selectedBar && (
+              <>
+                <Text style={styles.modalTitle}>{selectedBar.name}</Text>
+                <Text style={styles.modalSubtitle}>{selectedBar.location}</Text>
+
+                {selectedBar.promotion && (
+                  <>
+                    <Text style={styles.modalPromo}>
+                      Promo: ${selectedBar.promotion.price}
+                    </Text>
+                    {selectedBar.promotion.included && (
+                      <Text style={{ fontSize: 13, color: '#666', marginBottom: 10, textAlign: 'center' }}>
+                        {selectedBar.promotion.included}
+                      </Text>
+                    )}
+                  </>
+                )}
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 0.6,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      backgroundColor: '#EEE',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      setSelectedBar(null);
+                      router.push(`/bar/${selectedBar.id}?matchId=${selectedMatch.id}`);
+                    }}
+                  >
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: '#333' }}>
+                      Más info
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 8,
+                      backgroundColor: theme.tabBarActiveTintColor,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      setSelectedBar(null);
+                      router.push(`/reserve?barId=${selectedBar.id}&matchId=${selectedMatch.id}`);
+                    }}
+                  >
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.background }}>
+                      Reservar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity onPress={() => setSelectedBar(null)}>
+                  <Text style={{ marginTop: 10, color: '#666' }}>Cerrar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? 25 : 0,
-  },
-  container: {
-    padding: 10,
-  },
-  appTitle: {
-    fontSize: 28,
-    fontFamily: 'Montserrat-ExtraBold',
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontFamily: 'Montserrat-Black',
-    marginBottom: 10,
-  },
-  input: {
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  card: {
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontFamily: 'Montserrat-Black',
-  },
-  cardDate: {
-    fontSize: 14,
-    marginTop: 4,
-    fontFamily: 'Montserrat-Black',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'Montserrat-ExtraBold',
-    marginTop: 30,
-    marginBottom: 8,
-  },
-  noBars: {
-    marginTop: 8,
-    fontStyle: 'italic',
-    fontFamily: 'Montserrat-Black',
-  },
-  barsContainer: {
-    marginTop: 10,
-  },
-  map: {
-    width: '100%',
-    height: 300,
-    borderRadius: 10,
-    marginBottom: 160,
-  },
-  reserveButton: {
-    marginTop: 10,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  reserveButtonText: {
-    textAlign: 'center',
-    fontFamily: 'Montserrat-ExtraBold',
-  },
+  safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? 25 : 0 },
+  container: { padding: 10 },
+  appTitle: { fontSize: 28, fontFamily: 'Montserrat-ExtraBold', marginBottom: 5, textAlign: 'center' },
+  input: { padding: 10, borderRadius: 8, marginBottom: 20 },
+  filterTitle: { fontFamily: "Montserrat-ExtraBold", marginBottom: 6, marginTop: 12, color: "#555" },
+  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, marginBottom: 8, borderWidth: 1 },
+  card: { padding: 15, borderRadius: 10, marginBottom: 12 },
+  cardTitle: { fontSize: 16, fontFamily: 'Montserrat-Black' },
+  cardDate: { fontSize: 14, marginTop: 4, fontFamily: 'Montserrat-Black' },
+  sectionTitle: { fontSize: 18, fontFamily: 'Montserrat-ExtraBold', marginTop: 30, marginBottom: 8 },
+  barsContainer: { marginTop: 10 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalCard: { width: '80%', padding: 20, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center' },
+  modalTitle: { fontFamily: 'Montserrat-Black', fontSize: 18, marginBottom: 6 },
+  modalSubtitle: { fontSize: 14, color: '#666', marginBottom: 10 },
+  modalPromo: { fontSize: 14, color: '#D7A048', marginBottom: 5 },
 });

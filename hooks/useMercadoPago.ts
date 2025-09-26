@@ -1,74 +1,53 @@
+// hooks/useMercadoPago.ts
+const DASHBOARD_BASE_URL = 'https://admin.seatlyapp.com';
+
 export const useMercadoPago = () => {
   const createPreference = async ({
     title,
     userEmail,
     barId,
     matchId,
-    name,
-    phone,
     people,
     pricePerPerson,
-    barName,
-    matchTeams,
+    reservationId,   // debe venir de la reserva "pending"
   }: {
     title: string;
     userEmail: string;
     barId: string;
     matchId: string;
-    name: string;
-    phone: string;
     people: number;
     pricePerPerson: number;
-    barName: string;
-    matchTeams: string;
+    reservationId: string;
   }) => {
-    const token = process.env.EXPO_PUBLIC_MP_ACCESS_TOKEN;
-    const totalPrice = pricePerPerson * people;
-
-    const successUrl = `ido10s://payment/success?barId=${barId}&matchId=${matchId}&name=${encodeURIComponent(
-      name
-    )}&phone=${phone}&people=${people}&barName=${encodeURIComponent(
-      barName
-    )}&matchTeams=${encodeURIComponent(matchTeams)}`;
-
     try {
-      const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      const res = await fetch(`${DASHBOARD_BASE_URL}/api/createPreference`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: [
-            {
-              title,
-              unit_price: totalPrice,
-              quantity: 1,
-            },
-          ],
-          payer: {
-            email: userEmail,
-          },
-          back_urls: {
-            success: successUrl,
-            failure: 'ido10s://payment/failure',
-            pending: 'ido10s://payment/pending',
-          },
-          auto_return: 'approved',
+          title,
+          userEmail,
+          barId,
+          matchId,
+          people,
+          pricePerPerson,
+          reservationId,
         }),
       });
 
-      const data = await response.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!response.ok || !data.init_point) {
-        console.error('❌ MercadoPago ERROR:', data);
-        throw new Error('No se pudo generar el link de pago');
+      if (!res.ok) {
+        console.error('❌ createPreference HTTP error', res.status, data);
+        throw new Error(data?.error || 'Fallo al crear preferencia');
+      }
+      if (!data?.init_point) {
+        console.error('❌ createPreference sin init_point', data);
+        throw new Error('No se recibió el link de pago (init_point)');
       }
 
-      console.log('✅ MercadoPago init_point:', data.init_point);
-      return data.init_point;
-    } catch (err) {
-      console.error('❗ Error inesperado en createPreference:', err);
+      return data.init_point as string;
+    } catch (err: any) {
+      console.error('❗ Error en createPreference:', err);
       throw err;
     }
   };

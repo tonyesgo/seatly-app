@@ -1,10 +1,14 @@
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useRegisterPushToken } from '@/hooks/useNotifications'; // 👈 importar
 import { Stack } from 'expo-router';
 
 export default function Layout() {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
+
+  // 👇 este hook se ejecuta apenas carga el layout
+  useRegisterPushToken();
 
   return (
     <Stack
@@ -15,8 +19,8 @@ export default function Layout() {
         headerStyle: {
           backgroundColor: theme.tabBackground, // Color igual que fondo
         },
-        headerShadowVisible: false, // ✅ Esto va FUERA de headerStyle
-        headerTintColor: '#fff', // Color del botón de volver
+        headerShadowVisible: false, // ✅ va FUERA de headerStyle
+        headerTintColor: theme.text, // Color del botón de volver
       }}
     />
   );

@@ -1,21 +1,18 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, getAuth, updateProfile } from 'firebase/auth';
 import { doc, getFirestore, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import {
   Alert,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
-  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 
 import { ThemedButton } from '@/components/ui/ThemedButton';
 import { ThemedInput } from '@/components/ui/ThemedInput';
-import { ThemedView } from '@/components/ui/ThemedView';
 import Colors from '@/constants/Colors';
 import { app } from '@/firebaseConfig';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -25,7 +22,7 @@ const db = getFirestore(app);
 
 export default function RegisterScreen() {
   const router = useRouter();
-
+  const { redirectTo } = useLocalSearchParams();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
 
@@ -60,7 +57,20 @@ export default function RegisterScreen() {
         createdAt: new Date().toISOString(),
       });
 
-      router.replace('/tabs/userpanel');
+      let safeRedirect: string | null = null;
+      if (typeof redirectTo === 'string' && redirectTo.trim() !== '') {
+        try {
+          safeRedirect = decodeURIComponent(redirectTo);
+        } catch {
+          safeRedirect = redirectTo;
+        }
+      }
+
+      if (safeRedirect) {
+        router.replace(safeRedirect);
+      } else {
+        router.replace('/tabs/userpanel');
+      }
     } catch (error: any) {
       console.error('Error al registrar:', error);
       Alert.alert('Error', error.message);
@@ -69,44 +79,40 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.tabBackground }}
+      style={{ flex: 1, backgroundColor: theme.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          style={{ backgroundColor: theme.tabBackground }}
-        >
-          <ThemedView style={styles.container}>
-            <Text style={styles.title}>IDO10S</Text>
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: theme.text }]}>SEATLY</Text>
 
-            <ThemedInput placeholder="Nombre" value={name} onChangeText={setName} />
-            <ThemedInput placeholder="Apellido" value={lastName} onChangeText={setLastName} />
-            <ThemedInput
-              placeholder="Teléfono (10 dígitos)"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-            <ThemedInput
-              placeholder="Correo electrónico"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-            />
-            <ThemedInput
-              placeholder="Contraseña"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            <ThemedButton onPress={handleRegister}>Registrarme</ThemedButton>
-          </ThemedView>
-        </ScrollView>
-      </TouchableWithoutFeedback>
+        <ThemedInput placeholder="Nombre" value={name} onChangeText={setName} />
+        <ThemedInput placeholder="Apellido" value={lastName} onChangeText={setLastName} />
+        <ThemedInput
+          placeholder="Teléfono (10 dígitos)"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+        <ThemedInput
+          placeholder="Correo electrónico"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+        />
+        <ThemedInput
+          placeholder="Contraseña"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <ThemedButton onPress={handleRegister}>Registrarme</ThemedButton>
+        <ThemedButton onPress={() => router.push('/login')}>
+          Ya tengo cuenta, Iniciar sesión
+        </ThemedButton>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -123,7 +129,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     textAlign: 'center',
     marginBottom: 24,
-    color: '#D7A048',
     fontFamily: 'Montserrat-Black',
   },
 });

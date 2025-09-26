@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "794085316378",
+    "project_id": "ido10s",
+    "storage_bucket": "ido10s.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:794085316378:android:bc8202fdb278e8237a7ea3",
+        "android_client_info": {
+          "package_name": "com.tonyesgo.seatly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCn2JrFUtYrCjFXz2FqvYGu4Mp3uuhE99U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

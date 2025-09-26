@@ -1,5 +1,4 @@
-// reserve.tsx
-
+import { ThemedButton } from '@/components/ui/ThemedButton';
 import Colors from '@/constants/Colors';
 import { app } from '@/firebaseConfig';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -14,7 +13,9 @@ import {
   getDocs,
   getFirestore,
   query,
-  where,
+  serverTimestamp,
+  setDoc,
+  where
 } from 'firebase/firestore';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
@@ -25,7 +26,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -59,15 +59,8 @@ export default function ReserveScreen() {
       title: 'Reservar mesa',
       headerBackVisible: true,
       headerBackTitle: 'Inicio',
-      headerStyle: {
-        backgroundColor: theme.tabBackground,
-        shadowColor: 'transparent',
-        elevation: 0,
-      },
-      headerTitleStyle: {
-        color: theme.text,
-        fontWeight: 'bold',
-      },
+      headerStyle: { backgroundColor: theme.tabBackground, shadowColor: 'transparent', elevation: 0 },
+      headerTitleStyle: { color: theme.text, fontWeight: 'bold' },
       headerTintColor: theme.text,
     });
   }, [navigation, theme]);
@@ -83,9 +76,10 @@ export default function ReserveScreen() {
           const userData = userDoc.data() as { phone?: string };
           setPhone(userData.phone || '');
         }
+      } else {
+        setUser(null);
       }
     });
-
     return unsubscribe;
   }, []);
 
@@ -101,11 +95,7 @@ export default function ReserveScreen() {
         if (matchSnap.exists()) setMatch(matchSnap.data());
 
         const promoSnap = await getDoc(doc(db, 'matches', matchId as string, 'promotions', barId as string));
-        if (promoSnap.exists()) {
-          setPromo(promoSnap.data());
-        } else {
-          setPromo(null);
-        }
+        setPromo(promoSnap.exists() ? promoSnap.data() : null);
 
         const q = query(
           collection(db, 'reservations'),
@@ -113,58 +103,60 @@ export default function ReserveScreen() {
           where('matchId', '==', matchId)
         );
         const snapshot = await getDocs(q);
-        const total = snapshot.docs.reduce((sum, doc) => sum + (doc.data().people || 0), 0);
+        const total = snapshot.docs.reduce((sum, d) => sum + (d.data().people || 0), 0);
         setCurrentReservations(total);
       }
     };
-
     fetchBarAndMatch();
   }, [barId, matchId]);
 
   const assignTables = async (peopleCount: number): Promise<string[] | null> => {
+    const matchDoc = await getDoc(doc(db, 'matches', matchId as string));
+    const matchData = matchDoc.exists() ? matchDoc.data() : null;
+    if (!matchData) return null;
+
+    const broadcastBars: any[] = matchData.broadcastBars || [];
+    const barConfig = broadcastBars.find((b) => b.barId === barId);
+    if (!barConfig || !Array.isArray(barConfig.tableIds)) return null;
+
+    const tablesDisponibles = barConfig.tableIds;
+
     const allTablesSnap = await getDocs(collection(db, 'bars', barId as string, 'tables'));
-    const allTables: Table[] = allTablesSnap.docs.map((doc) => ({
-      id: doc.id,
-      capacity: doc.data().capacity,
+    const allTables: Table[] = allTablesSnap.docs.map((d) => ({
+      id: d.id,
+      capacity: d.data().capacity,
     }));
+
+    const availableTables = allTables.filter((t) => tablesDisponibles.includes(t.id));
 
     const resSnap = await getDocs(query(
       collection(db, 'reservations'),
-      where('matchId', '==', matchId)
+      where('matchId', '==', matchId),
+      where('barId', '==', barId)
     ));
 
-    const reservedTableIds = resSnap.docs.flatMap((doc) => doc.data().tableIds || []);
-    const freeTables = allTables.filter((t: any) => !reservedTableIds.includes(t.id));
+    const reservedTableIds = resSnap.docs
+      .filter((d) => d.data().status !== 'cancelled')
+      .flatMap((d) => d.data().tableIds || []);
+
+    const freeTables = availableTables
+      .filter((t) => !reservedTableIds.includes(t.id))
+      .sort((a, b) => a.capacity - b.capacity);
 
     const assigned: string[] = [];
     let remaining = peopleCount;
 
     for (const table of freeTables) {
-      if (remaining <= 0) break;
       assigned.push(table.id);
       remaining -= table.capacity;
+      if (remaining <= 0) break;
     }
 
-    if (remaining > 0) return null;
-    return assigned;
+    return remaining <= 0 ? assigned : null;
   };
 
   const handleReservation = async () => {
     if (!user) {
-      Alert.alert(
-        'Inicia sesión',
-        'Debes iniciar sesión o crear una cuenta para hacer una reserva.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Iniciar sesión',
-            onPress: () =>
-              router.push(
-                `/login?redirectTo=${encodeURIComponent(`/reserve?barId=${barId}&matchId=${matchId}`)}`
-              ),
-          },
-        ]
-      );
       return;
     }
 
@@ -196,27 +188,42 @@ export default function ReserveScreen() {
     const pricePerPerson = promo.price;
 
     try {
+      const draftRef = doc(collection(db, 'reservations'));
+      const reservationId = draftRef.id;
+      await setDoc(draftRef, {
+        id: reservationId,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        userId: user.uid,
+        userEmail: user.email || '',
+        name,
+        phone,
+        barId,
+        barName: bar?.name ?? '',
+        matchId,
+        matchTeams: match?.teams ?? '',
+        people: peopleCount,
+        pricePerPerson,
+        totalPrice: pricePerPerson * peopleCount,
+        paid: false,
+        paymentId: null,
+        source: 'app',
+      });
+
       const paymentUrl = await createPreference({
         title: `Reserva en ${bar?.name ?? ''} - ${match?.teams ?? ''}`,
         userEmail: user.email || '',
         barId: barId as string,
         matchId: matchId as string,
-        name,
-        phone,
         people: peopleCount,
         pricePerPerson,
-        barName: bar?.name ?? '',
-        matchTeams: match?.teams ?? '',
+        reservationId,
       });
 
       if (paymentUrl) {
         router.push({
           pathname: '/payment/webview',
-          params: {
-            initPoint: paymentUrl,
-            barId: barId as string,
-            matchId: matchId as string,
-          },
+          params: { initPoint: paymentUrl, reservationId },
         });
       } else {
         throw new Error('No se pudo generar el link de pago');
@@ -231,64 +238,54 @@ export default function ReserveScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.tabBackground }}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container}>
           {bar && match && (
             <>
               <Text style={[styles.title, { color: theme.text }]}>Reservar en {bar.name}</Text>
               <Text style={[styles.subtitle, { color: theme.text }]}>Para ver: {match.teams}</Text>
-
-              <TouchableOpacity
-                style={styles.linkButton}
-                onPress={() => router.push(`/bar/${barId}`)}
-              >
-                <Text style={[styles.linkButtonText, { color: theme.tabBarActiveTintColor }]}>Más información del bar</Text>
-              </TouchableOpacity>
-
+              <ThemedButton onPress={() => router.push(`/bar/${barId}`)}>
+                Más información del bar
+              </ThemedButton>
               {promo && (
-                <Text style={[styles.subtitle, { color: theme.text }]}>Promoción: {promo.included} — ${promo.price}</Text>
+                <Text style={[styles.subtitle, { color: theme.text }]}>
+                  Promoción: {promo.included} — ${promo.price}
+                </Text>
               )}
             </>
           )}
 
-          {!user && (
+          {!user ? (
+            <>
+              <Text style={[styles.subtitle, { color: theme.text, marginTop: 20 }]}>
+                Debes iniciar sesión para continuar con tu reserva
+              </Text>
+              <ThemedButton
+                onPress={() =>
+                  router.push(
+                    `/login?redirectTo=${encodeURIComponent(`/reserve?barId=${barId}&matchId=${matchId}`)}`
+                  )
+                }
+              >
+                Iniciar sesión o registrarse
+              </ThemedButton>
+            </>
+          ) : (
             <>
               <TextInput
                 style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                placeholder="Tu nombre"
+                placeholder="Número de personas"
                 placeholderTextColor="#999"
-                value={name}
-                onChangeText={setName}
+                value={people}
+                onChangeText={setPeople}
+                keyboardType="numeric"
               />
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                placeholder="Teléfono (10 dígitos)"
-                placeholderTextColor="#999"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-              />
+
+              <ThemedButton onPress={handleReservation}>
+                Pagar y reservar
+              </ThemedButton>
             </>
           )}
-
-          <TextInput
-            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-            placeholder="Número de personas"
-            placeholderTextColor="#999"
-            value={people}
-            onChangeText={setPeople}
-            keyboardType="numeric"
-          />
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.button }]}
-            onPress={handleReservation}
-          >
-            <Text style={[styles.buttonText, { color: theme.buttonText }]}>Pagar y reservar</Text>
-          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -296,48 +293,8 @@ export default function ReserveScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 22,
-    fontFamily: 'Montserrat-Black',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    fontFamily: 'Montserrat-ExtraBold',
-    marginBottom: 10,
-  },
-  availability: {
-    fontSize: 14,
-    fontFamily: 'Montserrat-ExtraBold',
-    marginBottom: 20,
-  },
-  input: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 15,
-    fontFamily: 'Montserrat-ExtraBold',
-  },
-  button: {
-    marginTop: 10,
-    paddingVertical: 14,
-    borderRadius: 8,
-  },
-  buttonText: {
-    textAlign: 'center',
-    fontFamily: 'Montserrat-Black',
-    fontSize: 16,
-  },
-  linkButton: {
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  linkButtonText: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-  },
+  container: { padding: 20, flexGrow: 1 },
+  title: { fontSize: 22, fontFamily: 'Montserrat-Black', marginBottom: 4 },
+  subtitle: { fontSize: 16, fontFamily: 'Montserrat-ExtraBold', marginBottom: 10 },
+  input: { padding: 12, borderRadius: 8, marginBottom: 15, fontFamily: 'Montserrat-ExtraBold' },
 });

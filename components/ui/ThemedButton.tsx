@@ -1,7 +1,7 @@
 // components/ui/ThemedButton.tsx
 import { useThemeColor } from '@/hooks/useThemeColor';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 type Props = {
   onPress: () => void;
@@ -14,7 +14,18 @@ export function ThemedButton({ onPress, children, style }: Props) {
   const textColor = useThemeColor({}, 'buttonText');
 
   return (
-    <TouchableOpacity onPress={onPress} style={[styles.button, { backgroundColor }, style]}>
+    <TouchableOpacity
+      onPress={onPress}
+      // 👇 esto asegura que también funcione en web
+      {...(Platform.OS === 'web' ? { onClick: onPress } : {})}
+      activeOpacity={0.7}
+      style={[
+        styles.button,
+        { backgroundColor },
+        Platform.OS === 'web' ? { cursor: 'pointer' } : {},
+        style,
+      ]}
+    >
       <Text style={[styles.text, { color: textColor }]}>{children}</Text>
     </TouchableOpacity>
   );

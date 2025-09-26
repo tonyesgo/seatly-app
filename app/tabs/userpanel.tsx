@@ -30,7 +30,7 @@ export default function UserPanelScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <ThemedText type="title" style={[styles.appTitle, { color: '#D7A048' }]}>
-            IDO10S
+            SEATLY
           </ThemedText>
         </View>
 

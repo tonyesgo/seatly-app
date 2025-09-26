@@ -1,5 +1,5 @@
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { StyleSheet, TextInput, TextInputProps } from 'react-native';
+import { Platform, StyleSheet, TextInput, TextInputProps } from 'react-native';
 
 export function ThemedInput(props: TextInputProps) {
   const backgroundColor = useThemeColor({}, 'inputBackground');
@@ -12,6 +12,9 @@ export function ThemedInput(props: TextInputProps) {
       style={[
         styles.input,
         { backgroundColor, color: textColor },
+        Platform.OS === 'web'
+          ? { outlineWidth: 0, fontFamily: 'Montserrat, sans-serif' }
+          : { fontFamily: 'Montserrat-Regular' },
         props.style,
       ]}
     />
@@ -23,6 +26,5 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginBottom: 15,
-    fontFamily: 'Montserrat-Regular',
   },
 });
