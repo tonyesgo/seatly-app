@@ -10,7 +10,8 @@
   "ios": "expo run:ios",
   "web": "expo start --web",
   "lint": "expo lint",
-  "build:web": "expo export:web"
+  "build:web": "expo export:web",
+  "vercel-build": "npm run build:web"
 
   },
   "dependencies": {
