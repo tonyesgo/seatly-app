@@ -2,7 +2,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import React from 'react';
 import { Text, TextProps, TextStyle } from 'react-native';
 
-type VariantType = 'default' | 'title' | 'subtitle' | 'error' | 'link';
+type VariantType = 'default' | 'title' | 'subtitle' | 'error' | 'link' | 'defaultSemiBold';
 
 type ThemedTextProps = TextProps & {
   type?: VariantType;
@@ -14,6 +14,10 @@ const textVariants: Record<VariantType, TextStyle> = {
   default: {
     fontSize: 16,
     fontFamily: 'Montserrat-Regular',
+  },
+  defaultSemiBold: {
+    fontSize: 16,
+    fontFamily: 'Montserrat-SemiBold',
   },
   title: {
     fontSize: 24,

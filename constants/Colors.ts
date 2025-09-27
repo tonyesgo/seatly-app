@@ -9,6 +9,7 @@ const Colors = {
   button: '#D7A048', // botón dorado
   buttonText: '#1B1D36', // texto oscuro sobre botón dorado
   inputBackground: '#ECEFF4', // input gris azulado claro
+  icon: '#333',
 },
 
   dark: {
@@ -19,6 +20,7 @@ const Colors = {
     button: '#D7A048',
     buttonText: '#212322',
     inputBackground: '#1F2937',
+    icon: '#fff',
   },
 };
 
