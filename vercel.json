@@ -11,5 +11,5 @@
       "dest": "/index.html"
     }
   ],
-  "outputDirectory": "dist"
+  "outputDirectory": ".expo/web-build"
 }
