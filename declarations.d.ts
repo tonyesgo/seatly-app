@@ -1,3 +1,5 @@
+/// <reference types="react" />
+
 // 👇 Declaración correcta para Map
 declare module "@/components/Map" {
   import { ComponentType } from "react";
@@ -9,14 +11,14 @@ declare module "@/components/Map" {
   export default MapView;
 }
 
-// 👇 Aquí definimos bien el módulo de Firebase
-declare module "firebase/auth/react-native" {
-  import { Persistence } from "firebase/auth";
+// 👇 Stub simple para Firebase (React Native)
+// Evita errores en TypeScript porque no existen typings oficiales
+// declarations.d.ts
 
-  // `getReactNativePersistence` devuelve un Persistence válido
-  export function getReactNativePersistence(storage: any): Persistence;
-}
-// 👇 Definición para firebaseConfig
+declare module "firebase/auth/react-native";
+
+
+// 👇 Definición para firebaseConfig (import común en el proyecto)
 declare module "@/firebaseConfig" {
   import type { FirebaseApp } from "firebase/app";
   import type { Auth } from "firebase/auth";

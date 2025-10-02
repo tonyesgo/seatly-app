@@ -1,4 +1,6 @@
 // firebaseConfig.native.ts
+/// <reference path="declarations.d.ts" />
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FirebaseApp, getApp, getApps, initializeApp } from "firebase/app";
 import { Auth, initializeAuth } from "firebase/auth";
