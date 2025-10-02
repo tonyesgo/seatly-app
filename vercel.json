@@ -1,14 +1,15 @@
 {
-  "version": 2,
   "builds": [
     {
       "src": "package.json",
       "use": "@vercel/static-build"
     }
   ],
-  "buildCommand": "npm run build:web",
-  "outputDirectory": "dist",
   "routes": [
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "outputDirectory": "dist"
 }
