@@ -4,16 +4,15 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-  "start": "expo start",
-  "reset-project": "node ./scripts/reset-project.js",
-  "android": "expo run:android",
-  "ios": "expo run:ios",
-  "web": "expo start --web",
-  "lint": "expo lint",
-  "build:web": "expo export",
-  "vercel-build": "npm run build:web"
-},
-
+    "start": "expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "build:web": "expo export",
+    "vercel-build": "npm run build:web"
+  },
   "dependencies": {
     "@expo/vector-icons": "14.1.0",
     "@react-google-maps/api": "^2.20.7",
@@ -24,7 +23,7 @@
     "@react-navigation/native": "^7.1.6",
     "babel-plugin-dotenv-import": "3.0.1",
     "date-fns": "4.1.0",
-    "expo": "53.0.22",
+    "expo": "^53.0.23",
     "expo-blur": "14.1.5",
     "expo-constants": "17.1.7",
     "expo-dev-client": "5.2.4",
@@ -45,7 +44,7 @@
     "locale": "0.1.0",
     "next": "^15.5.4",
     "react": "19.0.0",
-    "react-dom": "^19.0.0",
+    "react-dom": "19.0.0",
     "react-native": "0.79.5",
     "react-native-dotenv": "3.4.11",
     "react-native-gesture-handler": "2.24.0",
@@ -64,6 +63,7 @@
     "@types/babel__template": "7.4.4",
     "@types/babel__traverse": "7.28.0",
     "@types/geojson": "7946.0.16",
+    "@types/google.maps": "^3.58.1",
     "@types/hammerjs": "2.0.46",
     "@types/react": "19.0.10",
     "@types/react-dom": "18.3.2",
@@ -80,5 +80,8 @@
     "@react-native/metro-config": "^0.82.5",
     "metro-cache": "^0.82.5",
     "metro-source-map": "^0.82.5"
+  },
+  "browser": {
+    "./firebaseConfig.native.ts": "./firebaseConfig.web.ts"
   }
 }

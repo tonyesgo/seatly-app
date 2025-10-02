@@ -4,37 +4,30 @@
     "target": "esnext",
     "lib": ["dom", "dom.iterable", "esnext"],
 
-    // Permisos generales
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
 
-    // Seguridad y consistencia
     "strict": true,
     "forceConsistentCasingInFileNames": true,
 
-    // Resolución de módulos
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
 
-    // JSX adaptado a React Native
     "jsx": "react-native",
 
-    // Paths para imports con "@"
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+
+    "types": ["google.maps"]
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "declarations.d.ts"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "declarations.d.ts"],
   "exclude": [
     "node_modules",
     "babel.config.js",
