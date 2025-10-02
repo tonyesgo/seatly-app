@@ -1,9 +1,8 @@
 import { app } from '@/firebaseConfig';
-import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getFirestore, runTransaction } from 'firebase/firestore';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, Platform, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const db = getFirestore(app);
@@ -24,35 +23,18 @@ export default function PaymentWebView() {
     });
   }, [reservationId]);
 
-  // **SINCRÓNICO**: devuelve boolean; los efectos async se lanzan y luego retornamos
   const handleShouldStart = useCallback((req: any): boolean => {
     const url: string = req?.url || '';
 
-    // Deep link: seatly://payment/success?rid=...
-    if (url.startsWith('seatly://payment/success')) {
-      try {
-        const parsed = Linking.parse(url);
-        const rid = (parsed.queryParams?.rid as string) || String(reservationId);
-        (async () => {
-          try {
-            if (rid) await finalizeReservation();
-            router.replace({ pathname: '/payment/confirmed', params: { reservationId: String(reservationId) } });
-          } catch {
-            Alert.alert('Pago', 'Pago aprobado, pero hubo un detalle al confirmar. Revisa “Mis reservas”.');
-            router.replace('/myreservations');
-          }
-        })();
-      } catch {
-        // ignore
-      }
-      return false; // evita que la WebView intente abrir el scheme
-    }
-
-    // Back URL HTTP(S): .../payment/success?rid=...
-    if (url.includes('/payment/success')) {
+    if (url.startsWith('seatly://payment/success') || url.includes('/payment/success')) {
       (async () => {
-        await finalizeReservation();
-        router.replace({ pathname: '/payment/confirmed', params: { reservationId: String(reservationId) } });
+        try {
+          await finalizeReservation();
+          router.replace({ pathname: '/payment/confirmed', params: { reservationId: String(reservationId) } });
+        } catch {
+          Alert.alert('Pago', 'Pago aprobado, pero hubo un detalle al confirmar. Revisa “Mis reservas”.');
+          router.replace('/myreservations');
+        }
       })();
       return false;
     }
@@ -66,16 +48,28 @@ export default function PaymentWebView() {
       return false;
     }
 
-    return true; // permitir otras navegaciones
+    return true;
   }, [finalizeReservation, reservationId, router]);
 
-  // Respaldo (no bloquea navegación, solo detecta y redirige)
   const handleNavChange = useCallback((navState: any) => {
     handleShouldStart(navState);
   }, [handleShouldStart]);
 
   if (!initPoint || typeof initPoint !== 'string') return null;
 
+  // 🚨 Fallback para web: nunca intentes renderizar WebView
+  if (Platform.OS === 'web') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Text style={{ marginBottom: 20, fontSize: 16, textAlign: 'center' }}>
+          Estás en la versión web. Haz clic en el botón de abajo para continuar con tu pago en MercadoPago:
+        </Text>
+        <Button title="Ir a MercadoPago" onPress={() => { window.location.href = String(initPoint); }} />
+      </View>
+    );
+  }
+
+  // ✅ En móvil sí usamos WebView
   return (
     <View style={{ flex: 1 }}>
       {loading && (
@@ -84,8 +78,8 @@ export default function PaymentWebView() {
       <WebView
         source={{ uri: initPoint }}
         onLoadEnd={() => setLoading(false)}
-        onShouldStartLoadWithRequest={handleShouldStart} // ✅ ahora es sincrónico
-        onNavigationStateChange={handleNavChange}        // respaldo
+        onShouldStartLoadWithRequest={handleShouldStart}
+        onNavigationStateChange={handleNavChange}
         startInLoadingState
       />
     </View>

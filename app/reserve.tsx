@@ -221,10 +221,16 @@ export default function ReserveScreen() {
       });
 
       if (paymentUrl) {
-        router.push({
-          pathname: '/payment/webview',
-          params: { initPoint: paymentUrl, reservationId },
-        });
+        if (Platform.OS === 'web') {
+          // 👉 En web redirigimos directo a MercadoPago
+          window.location.href = paymentUrl;
+        } else {
+          // 👉 En móvil seguimos usando WebView
+          router.push({
+            pathname: '/payment/webview',
+            params: { initPoint: paymentUrl, reservationId },
+          });
+        }
       } else {
         throw new Error('No se pudo generar el link de pago');
       }
