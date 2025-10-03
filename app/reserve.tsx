@@ -13,6 +13,8 @@ import {
   getDocs,
   getFirestore,
   query,
+  serverTimestamp,
+  setDoc,
   where,
 } from 'firebase/firestore';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
@@ -108,14 +110,15 @@ export default function ReserveScreen() {
     fetchBarAndMatch();
   }, [barId, matchId]);
 
-  const assignTables = async (peopleCount: number): Promise<string[] | null> => {
+  // 🔹 Verifica disponibilidad, pero NO asigna mesas aún
+  const checkAvailability = async (peopleCount: number): Promise<boolean> => {
     const matchDoc = await getDoc(doc(db, 'matches', matchId as string));
     const matchData = matchDoc.exists() ? matchDoc.data() : null;
-    if (!matchData) return null;
+    if (!matchData) return false;
 
     const broadcastBars: any[] = matchData.broadcastBars || [];
     const barConfig = broadcastBars.find((b) => b.barId === barId);
-    if (!barConfig || !Array.isArray(barConfig.tableIds)) return null;
+    if (!barConfig || !Array.isArray(barConfig.tableIds)) return false;
 
     const tablesDisponibles = barConfig.tableIds;
 
@@ -130,27 +133,25 @@ export default function ReserveScreen() {
     const resSnap = await getDocs(query(
       collection(db, 'reservations'),
       where('matchId', '==', matchId),
-      where('barId', '==', barId)
+      where('barId', '==', barId),
+      where('status', 'in', ['pending', 'confirmed']) // 🔹 tomamos en cuenta las reservas pendientes y confirmadas
     ));
 
     const reservedTableIds = resSnap.docs
-      .filter((d) => d.data().status !== 'cancelled')
       .flatMap((d) => d.data().tableIds || []);
 
     const freeTables = availableTables
       .filter((t) => !reservedTableIds.includes(t.id))
       .sort((a, b) => a.capacity - b.capacity);
 
-    const assigned: string[] = [];
     let remaining = peopleCount;
 
     for (const table of freeTables) {
-      assigned.push(table.id);
       remaining -= table.capacity;
-      if (remaining <= 0) break;
+      if (remaining <= 0) return true;
     }
 
-    return remaining <= 0 ? assigned : null;
+    return false;
   };
 
   const handleReservation = async () => {
@@ -175,8 +176,9 @@ export default function ReserveScreen() {
       return;
     }
 
-    const tableIds = await assignTables(peopleCount);
-    if (!tableIds) {
+    // 🔹 Paso extra: verificar disponibilidad antes de crear reserva
+    const hasAvailability = await checkAvailability(peopleCount);
+    if (!hasAvailability) {
       Alert.alert('Capacidad excedida', 'Ya no hay suficientes mesas disponibles.');
       return;
     }
@@ -184,9 +186,30 @@ export default function ReserveScreen() {
     const pricePerPerson = promo.price;
 
     try {
-      // Generamos un id de reserva, pero NO guardamos aún en Firestore
+      // 1) Generamos un id de reserva
       const reservationId = doc(collection(db, 'reservations')).id;
 
+      // 2) Guardamos reserva PENDING en Firestore (sin tableIds aún)
+      await setDoc(doc(db, 'reservations', reservationId), {
+        id: reservationId,
+        status: 'pending',
+        paid: false,
+        createdAt: serverTimestamp(),
+        userId: user.uid,
+        userEmail: user.email || '',
+        name,
+        phone,
+        barId,
+        barName: bar?.name ?? '',
+        matchId,
+        matchTeams: match?.teams ?? '',
+        people: peopleCount,
+        pricePerPerson,
+        totalPrice: peopleCount * pricePerPerson,
+        source: 'app',
+      });
+
+      // 3) Creamos preferencia en MP
       const paymentUrl = await createPreference({
         title: `Reserva en ${bar?.name ?? ''} - ${match?.teams ?? ''}`,
         userEmail: user.email || '',
@@ -197,9 +220,10 @@ export default function ReserveScreen() {
         reservationId,
       });
 
+      // 4) Redirigimos a MP
       if (paymentUrl) {
         if (Platform.OS === 'web') {
-          window.location.href = paymentUrl; // en web redirigimos directo
+          window.location.href = paymentUrl; 
         } else {
           router.push({
             pathname: '/payment/webview',
@@ -215,7 +239,6 @@ export default function ReserveScreen() {
               matchTeams: match?.teams ?? '',
               name,
               phone,
-              tableIds: JSON.stringify(tableIds),
             },
           });
         }
