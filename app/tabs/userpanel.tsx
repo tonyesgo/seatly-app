@@ -7,6 +7,8 @@ import { ThemedButton } from '@/components/ui/ThemedButton';
 import { ThemedText } from '@/components/ui/ThemedText';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Image } from 'react-native';
+
 
 export default function UserPanelScreen() {
   const auth = getAuth();
@@ -28,11 +30,14 @@ export default function UserPanelScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.tabBackground }]}>
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <ThemedText type="title" style={[styles.appTitle, { color: '#D7A048' }]}>
-            SEATLY
-          </ThemedText>
-        </View>
+        <View style={{ alignItems: "center", marginBottom: 20 }}>
+                <Image
+                  source={require("../../public/seatly-full.png")} // 👈 ajusta la ruta según tu estructura
+                  style={{ width: 160, height: 80 }} // ajusta tamaño a tu gusto
+                  resizeMode="contain"
+                />
+              </View>
+
 
         <ThemedText type="title" style={{ color: theme.text }}>Mi cuenta</ThemedText>
 

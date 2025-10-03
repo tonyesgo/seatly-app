@@ -116,7 +116,7 @@ export default function BarDetailScreen() {
       {matchId && (
         <ThemedButton
           onPress={() =>
-            router.push(`/reserve?barId=${barId}&matchId=${matchId}`)
+            router.push(`/tabs/reserve?barId=${barId}&matchId=${matchId}`)
           }
         >
           Reservar
