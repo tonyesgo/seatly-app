@@ -33,7 +33,6 @@ export default function TabLayout() {
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <Tabs
         screenOptions={{
-          // ✅ Oculta el header de todas las pantallas bajo /tabs
           headerShown: false,
           tabBarActiveTintColor: theme.tabBarActiveTintColor,
           tabBarButton: HapticTab,
@@ -46,6 +45,7 @@ export default function TabLayout() {
           }),
         }}
       >
+        {/* ✅ Visible en la barra */}
         <Tabs.Screen
           name="index"
           options={{
@@ -55,6 +55,7 @@ export default function TabLayout() {
             ),
           }}
         />
+        {/* ✅ Visible en la barra */}
         <Tabs.Screen
           name="userpanel"
           options={{
@@ -64,6 +65,9 @@ export default function TabLayout() {
             ),
           }}
         />
+        {/* 👇 Ocultos pero con layout */}
+        <Tabs.Screen name="reserve" options={{ href: null }} />
+        <Tabs.Screen name="myreservations" options={{ href: null }} />
       </Tabs>
     </View>
   );

@@ -45,7 +45,7 @@ export default function UserPanelScreen() {
               Correo: {user.email}
             </ThemedText>
 
-            <ThemedButton onPress={() => router.push('/myreservations')}>
+            <ThemedButton onPress={() => router.push('/tabs/myreservations')}>
               Mis reservas
             </ThemedButton>
 

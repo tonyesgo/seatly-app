@@ -408,7 +408,7 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: theme.tabBarActiveTintColor, alignItems: 'center' }}
-                    onPress={() => router.push(`/reserve?barId=${bar.id}&matchId=${selectedMatch.id}`)}
+                    onPress={() => router.push(`/tabs/reserve?barId=${bar.id}&matchId=${selectedMatch.id}`)}
                   >
                     <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.background }}>
                       Reservar
@@ -543,7 +543,7 @@ export default function HomeScreen() {
                     }}
                     onPress={() => {
                       setSelectedBar(null);
-                      router.push(`/reserve?barId=${selectedBar.id}&matchId=${selectedMatch.id}`);
+                      router.push(`/tabs/reserve?barId=${selectedBar.id}&matchId=${selectedMatch.id}`);
                     }}
                   >
                     <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.background }}>
