@@ -41,31 +41,41 @@ export default function PaymentSuccess() {
       }
 
       try {
-        // 1) reservationId desde deep link (acepta reservationId o rid)
-        const reservationIdParam = String(reservationId || rid || '');
-        if (!reservationIdParam) throw new Error('Falta reservationId en el deep link');
+        let reservationIdParam = String(reservationId || rid || '');
 
-        // 2) Determinar paymentId (MP puede mandar collection_id/collection_status)
+        // 1) Determinar paymentId (MP puede mandar collection_id/collection_status)
         const maybePaymentId =
           (payment_id as string) ||
           (collection_status === 'approved' ? (collection_id as string) : '');
 
         if (!maybePaymentId) {
           Alert.alert('Pago en proceso', 'Aún no recibimos el ID de pago.');
-          router.replace(`/payment/pending?reservationId=${encodeURIComponent(reservationIdParam)}`);
           return;
         }
 
-        // 3) Verificar en backend que el pago esté aprobado
+        // 2) Verificar en backend que el pago esté aprobado
         const verifyRes = await fetch(
           `${DASHBOARD_BASE_URL}/api/verifyPayment?payment_id=${encodeURIComponent(maybePaymentId)}`
         );
         const verifyData = await verifyRes.json();
 
+        if (!verifyRes.ok) {
+          throw new Error(`Error verificando pago: ${JSON.stringify(verifyData)}`);
+        }
+
         if (verifyData.status !== 'approved') {
           Alert.alert('Pago en proceso', 'Tu pago aún no está aprobado');
-          router.replace(`/payment/pending?reservationId=${encodeURIComponent(reservationIdParam)}`);
+          router.replace(`/payment/pending?reservationId=${encodeURIComponent(reservationIdParam || 'unknown')}`);
           return;
+        }
+
+        // 3) Si no venía en el deep link, obtener reservationId desde external_reference
+        if (!reservationIdParam) {
+          reservationIdParam = verifyData.external_reference;
+        }
+
+        if (!reservationIdParam) {
+          throw new Error('No se pudo determinar reservationId');
         }
 
         // 4) Cargar la reserva pending que ya creaste antes de pagar
@@ -91,7 +101,7 @@ export default function PaymentSuccess() {
           throw new Error('Reserva incompleta (barId/matchId/people faltan)');
         }
 
-        // 5) Mesas disponibles (excluye confirmed y pending con tableIds asignadas)
+        // 5) Mesas disponibles
         const tablesSnap = await getDocs(collection(db, 'bars', barId, 'tables'));
         const allTables = tablesSnap.docs.map((d) => ({
           id: d.id,
@@ -115,19 +125,14 @@ export default function PaymentSuccess() {
         );
 
         const freeTables = allTables.filter((t) => !reservedIds.has(t.id));
-
-        // 👉 Ordenar mesas por capacidad ascendente (más chicas primero)
         freeTables.sort((a, b) => a.capacity - b.capacity);
 
-        // 6) Asignación optimizada
+        // 6) Asignación de mesas
         let assigned: string[] = [];
-
-        // (a) Intentar con una sola mesa que cubra a todos
         const singleTable = freeTables.find((t) => t.capacity >= peopleCount);
         if (singleTable) {
           assigned = [singleTable.id];
         } else {
-          // (b) Combinar varias mesas chicas hasta cubrir
           let remaining = peopleCount;
           for (const t of freeTables) {
             if (remaining <= 0) break;
@@ -140,7 +145,7 @@ export default function PaymentSuccess() {
           }
         }
 
-        // 7) Actualizar esta misma reserva como confirmada
+        // 7) Confirmar reserva
         await updateDoc(resRef, {
           tableIds: assigned,
           paid: true,
@@ -149,7 +154,7 @@ export default function PaymentSuccess() {
           updatedAt: serverTimestamp(),
         });
 
-        // 8) (Opcional) Formatear fecha del partido para mostrarla en la confirmación
+        // 8) Formatear fecha del partido
         let matchDateFormatted = '';
         const matchSnap = await getDoc(doc(db, 'matches', matchId as string));
         if (matchSnap.exists()) {
