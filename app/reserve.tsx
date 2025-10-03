@@ -13,9 +13,7 @@ import {
   getDocs,
   getFirestore,
   query,
-  serverTimestamp,
-  setDoc,
-  where
+  where,
 } from 'firebase/firestore';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
@@ -156,9 +154,7 @@ export default function ReserveScreen() {
   };
 
   const handleReservation = async () => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     const peopleCount = parseInt(people);
 
@@ -188,27 +184,8 @@ export default function ReserveScreen() {
     const pricePerPerson = promo.price;
 
     try {
-      const draftRef = doc(collection(db, 'reservations'));
-      const reservationId = draftRef.id;
-      await setDoc(draftRef, {
-        id: reservationId,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        userId: user.uid,
-        userEmail: user.email || '',
-        name,
-        phone,
-        barId,
-        barName: bar?.name ?? '',
-        matchId,
-        matchTeams: match?.teams ?? '',
-        people: peopleCount,
-        pricePerPerson,
-        totalPrice: pricePerPerson * peopleCount,
-        paid: false,
-        paymentId: null,
-        source: 'app',
-      });
+      // Generamos un id de reserva, pero NO guardamos aún en Firestore
+      const reservationId = doc(collection(db, 'reservations')).id;
 
       const paymentUrl = await createPreference({
         title: `Reserva en ${bar?.name ?? ''} - ${match?.teams ?? ''}`,
@@ -222,13 +199,24 @@ export default function ReserveScreen() {
 
       if (paymentUrl) {
         if (Platform.OS === 'web') {
-          // 👉 En web redirigimos directo a MercadoPago
-          window.location.href = paymentUrl;
+          window.location.href = paymentUrl; // en web redirigimos directo
         } else {
-          // 👉 En móvil seguimos usando WebView
           router.push({
             pathname: '/payment/webview',
-            params: { initPoint: paymentUrl, reservationId },
+            params: {
+              initPoint: paymentUrl,
+              reservationId,
+              barId: barId as string,
+              matchId: matchId as string,
+              people: String(peopleCount),
+              pricePerPerson: String(pricePerPerson),
+              userEmail: user.email || '',
+              barName: bar?.name ?? '',
+              matchTeams: match?.teams ?? '',
+              name,
+              phone,
+              tableIds: JSON.stringify(tableIds),
+            },
           });
         }
       } else {
@@ -239,8 +227,6 @@ export default function ReserveScreen() {
       Alert.alert('Error', 'No se pudo iniciar el proceso de pago');
     }
   };
-
-  const remaining = bar?.capacity ? bar.capacity - currentReservations : null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.tabBackground }}>

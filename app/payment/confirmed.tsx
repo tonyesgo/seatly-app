@@ -1,115 +1,187 @@
-import Colors from '@/constants/Colors';
+// app/payment/success.tsx
 import { app } from '@/firebaseConfig';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
+import { useEffect } from 'react';
+import { Alert } from 'react-native';
 
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-export default function ConfirmedScreen() {
-  const params = useLocalSearchParams();
+// Usa tu dominio público del dashboard
+const DASHBOARD_BASE_URL = 'https://admin.seatlyapp.com';
+
+export default function PaymentSuccess() {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? 'light';
-  const theme = Colors[colorScheme];
 
-  const barId = typeof params.barId === 'string' ? decodeURIComponent(params.barId) : null;
-  const matchId = typeof params.matchId === 'string' ? decodeURIComponent(params.matchId) : null;
-
-  const [resolvedBarName, setResolvedBarName] = useState<string | null>(
-    params.barName ? decodeURIComponent(params.barName as string) : null
-  );
-  const [resolvedMatchTeams, setResolvedMatchTeams] = useState<string | null>(
-    params.matchTeams ? decodeURIComponent(params.matchTeams as string) : null
-  );
-  const decodedDate = params.matchDate ? decodeURIComponent(params.matchDate as string) : '';
-  const peopleCount = parseInt(params.people as string || '1');
+  const {
+    reservationId,
+    rid,
+    payment_id,
+    collection_id,
+    collection_status,
+  } = useLocalSearchParams();
 
   useEffect(() => {
-    const fetchFallbackNames = async () => {
-      if (!resolvedBarName && barId) {
-        const barDoc = await getDoc(doc(db, 'bars', barId));
-        if (barDoc.exists()) {
-          setResolvedBarName(barDoc.data().name || 'bar');
-        }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        Alert.alert('Error', 'Usuario no autenticado');
+        return;
       }
 
-      if (!resolvedMatchTeams && matchId) {
-        const matchDoc = await getDoc(doc(db, 'matches', matchId));
-        if (matchDoc.exists()) {
-          setResolvedMatchTeams(matchDoc.data().teams || 'partido');
+      try {
+        // 1) reservationId desde deep link (acepta reservationId o rid)
+        const reservationIdParam = String(reservationId || rid || '');
+        if (!reservationIdParam) throw new Error('Falta reservationId en el deep link');
+
+        // 2) Determinar paymentId (MP puede mandar collection_id/collection_status)
+        const maybePaymentId =
+          (payment_id as string) ||
+          (collection_status === 'approved' ? (collection_id as string) : '');
+
+        if (!maybePaymentId) {
+          Alert.alert('Pago en proceso', 'Aún no recibimos el ID de pago.');
+          router.replace(`/payment/pending?reservationId=${encodeURIComponent(reservationIdParam)}`);
+          return;
         }
+
+        // 3) Verificar en backend que el pago esté aprobado
+        const verifyRes = await fetch(
+          `${DASHBOARD_BASE_URL}/api/verifyPayment?payment_id=${encodeURIComponent(maybePaymentId)}`
+        );
+        const verifyData = await verifyRes.json();
+
+        if (verifyData.status !== 'approved') {
+          Alert.alert('Pago en proceso', 'Tu pago aún no está aprobado');
+          router.replace(`/payment/pending?reservationId=${encodeURIComponent(reservationIdParam)}`);
+          return;
+        }
+
+        // 4) Cargar la reserva pending que ya creaste antes de pagar
+        const resRef = doc(db, 'reservations', reservationIdParam);
+        const resSnap = await getDoc(resRef);
+        if (!resSnap.exists()) throw new Error('Reserva no encontrada');
+
+        const resData = resSnap.data() as any;
+
+        // Idempotencia: si ya estaba confirmada, redirige directo
+        if (resData.status === 'confirmed' && resData.paid === true) {
+          router.replace(
+            `/payment/confirmed?barName=${encodeURIComponent(resData.barName || '')}` +
+              `&matchTeams=${encodeURIComponent(resData.matchTeams || '')}` +
+              `&people=${encodeURIComponent(String(resData.people || 1))}`
+          );
+          return;
+        }
+
+        const { barId, matchId, people, barName, matchTeams } = resData;
+        const peopleCount = Number(people || 0);
+        if (!barId || !matchId || !peopleCount) {
+          throw new Error('Reserva incompleta (barId/matchId/people faltan)');
+        }
+
+        // 5) Mesas disponibles (excluye confirmed y pending con tableIds asignadas)
+        const tablesSnap = await getDocs(collection(db, 'bars', barId, 'tables'));
+        const allTables = tablesSnap.docs.map((d) => ({
+          id: d.id,
+          capacity: Number(d.data().capacity || 0),
+        }));
+
+        const resSameMatchBar = await getDocs(
+          query(
+            collection(db, 'reservations'),
+            where('matchId', '==', matchId),
+            where('barId', '==', barId),
+            where('status', 'in', ['confirmed', 'pending'])
+          )
+        );
+
+        const reservedIds = new Set(
+          resSameMatchBar.docs.flatMap((d) => {
+            const data = d.data() as any;
+            return Array.isArray(data.tableIds) ? data.tableIds : [];
+          })
+        );
+
+        const freeTables = allTables.filter((t) => !reservedIds.has(t.id));
+
+        // 👉 Ordenar mesas por capacidad ascendente (más chicas primero)
+        freeTables.sort((a, b) => a.capacity - b.capacity);
+
+        // 6) Asignación optimizada
+        let assigned: string[] = [];
+
+        // (a) Intentar con una sola mesa que cubra a todos
+        const singleTable = freeTables.find((t) => t.capacity >= peopleCount);
+        if (singleTable) {
+          assigned = [singleTable.id];
+        } else {
+          // (b) Combinar varias mesas chicas hasta cubrir
+          let remaining = peopleCount;
+          for (const t of freeTables) {
+            if (remaining <= 0) break;
+            assigned.push(t.id);
+            remaining -= t.capacity;
+          }
+          if (remaining > 0) {
+            Alert.alert('Error', 'No hay mesas suficientes para esta reserva');
+            return;
+          }
+        }
+
+        // 7) Actualizar esta misma reserva como confirmada
+        await updateDoc(resRef, {
+          tableIds: assigned,
+          paid: true,
+          status: 'confirmed',
+          paymentId: String(maybePaymentId),
+          updatedAt: serverTimestamp(),
+        });
+
+        // 8) (Opcional) Formatear fecha del partido para mostrarla en la confirmación
+        let matchDateFormatted = '';
+        const matchSnap = await getDoc(doc(db, 'matches', matchId as string));
+        if (matchSnap.exists()) {
+          const matchData = matchSnap.data() as any;
+          const rawDate = matchData?.date?.toDate?.() || new Date(matchData?.date);
+          if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+            matchDateFormatted = rawDate.toLocaleString('es-MX', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          }
+        }
+
+        // 9) Redirigir a confirmación
+        router.replace(
+          `/payment/confirmed?barName=${encodeURIComponent(barName || '')}` +
+            `&matchTeams=${encodeURIComponent(matchTeams || '')}` +
+            `&people=${encodeURIComponent(String(peopleCount))}` +
+            (matchDateFormatted ? `&matchDate=${encodeURIComponent(matchDateFormatted)}` : '')
+        );
+      } catch (error) {
+        console.error('❌ Error en payment/success:', error);
+        Alert.alert('Error', 'No se pudo confirmar la reserva');
       }
-    };
+    });
 
-    fetchFallbackNames();
-  }, [barId, matchId]);
+    return unsubscribe;
+  }, []);
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.tabBackground }]}>
-      <Text style={[styles.emoji, { fontSize: 80 }]}>✅</Text>
-      <Text style={[styles.title, { color: theme.text }]}>¡Reserva confirmada!</Text>
-
-      <Text style={[styles.subtitle, { color: theme.text }]}>
-        Has reservado {peopleCount} persona{peopleCount > 1 ? 's' : ''} para ver{' '}
-        {resolvedMatchTeams || 'partido'} en {resolvedBarName || 'bar'}.
-      </Text>
-
-      {decodedDate ? (
-        <Text style={[styles.date, { color: theme.text }]}>
-          Fecha del partido: {decodedDate}
-        </Text>
-      ) : null}
-
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: theme.button, marginTop: 30 }]}
-        onPress={() => router.replace('/myreservations')}
-      >
-        <Text style={[styles.buttonText, { color: theme.buttonText }]}>
-          Ver mis reservas
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+  return null;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 24,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emoji: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontFamily: 'Montserrat-Black',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    fontFamily: 'Montserrat-SemiBold',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  date: {
-    fontSize: 14,
-    fontFamily: 'Montserrat-Regular',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  button: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontFamily: 'Montserrat-Black',
-    textAlign: 'center',
-  },
-});
