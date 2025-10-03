@@ -53,10 +53,6 @@ function getStatusBadge(res: ResItem) {
       ? { label: 'Completada', bg: '#E6F7EE', fg: '#0F8F4D' }
       : { label: 'Confirmada', bg: '#E6F7EE', fg: '#0F8F4D' };
   }
-  if (res.status === 'pending' && !res.paid) {
-    return { label: 'Pendiente de pago', bg: '#FFF4E5', fg: '#B35C00' };
-  }
-
   if (res.paid) {
     return isPast
       ? { label: 'Completada', bg: '#E6F7EE', fg: '#0F8F4D' }
@@ -105,7 +101,12 @@ export default function MyReservationsScreen() {
     const fetchReservations = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'reservations'), where('userId', '==', userId));
+        // 👇 Solo traer reservas confirmadas del usuario
+        const q = query(
+          collection(db, 'reservations'),
+          where('userId', '==', userId),
+          where('status', '==', 'confirmed')
+        );
         const snap = await getDocs(q);
 
         const dataWithDetails: ResItem[] = await Promise.all(
@@ -173,18 +174,11 @@ export default function MyReservationsScreen() {
   const { visibleList, emptyLabel } = useMemo(() => {
     const now = new Date();
     const active = reservations
-      .filter((r) => {
-        if (r.status === 'cancelled') return false;
-        if (!r.matchDate) return false;
-        return r.matchDate.getTime() >= now.getTime();
-      })
+      .filter((r) => r.matchDate && r.matchDate.getTime() >= now.getTime())
       .sort((a, b) => (a.matchDate?.getTime() ?? 0) - (b.matchDate?.getTime() ?? 0));
 
     const past = reservations
-      .filter((r) => {
-        if (r.status === 'cancelled') return true;
-        return !r.matchDate || r.matchDate.getTime() < now.getTime();
-      })
+      .filter((r) => !r.matchDate || r.matchDate.getTime() < now.getTime())
       .sort((a, b) => (b.matchDate?.getTime() ?? 0) - (a.matchDate?.getTime() ?? 0));
 
     if (showPast) {
