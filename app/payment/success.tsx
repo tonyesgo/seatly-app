@@ -19,7 +19,7 @@ import { Alert } from 'react-native';
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Usa tu dominio público del dashboard
+// 🔹 Dominio de tu dashboard (Next.js en Vercel)
 const DASHBOARD_BASE_URL = 'https://admin.seatlyapp.com';
 
 export default function PaymentSuccess() {
@@ -41,9 +41,10 @@ export default function PaymentSuccess() {
       }
 
       try {
+        // 1) Intentar obtener reservationId del deep link
         let reservationIdParam = String(reservationId || rid || '');
 
-        // 1) Determinar paymentId (MP puede mandar collection_id/collection_status)
+        // 2) Determinar paymentId (MP puede mandar collection_id/collection_status)
         const maybePaymentId =
           (payment_id as string) ||
           (collection_status === 'approved' ? (collection_id as string) : '');
@@ -53,7 +54,7 @@ export default function PaymentSuccess() {
           return;
         }
 
-        // 2) Verificar en backend que el pago esté aprobado
+        // 3) Verificar en backend que el pago esté aprobado
         const verifyRes = await fetch(
           `${DASHBOARD_BASE_URL}/api/verifyPayment?payment_id=${encodeURIComponent(maybePaymentId)}`
         );
@@ -69,23 +70,23 @@ export default function PaymentSuccess() {
           return;
         }
 
-        // 3) Si no venía en el deep link, obtener reservationId desde external_reference
-        if (!reservationIdParam) {
-          reservationIdParam = verifyData.external_reference;
+        // 4) Si el deep link no traía reservationId, usar external_reference
+        if (!reservationIdParam && verifyData.external_reference) {
+          reservationIdParam = String(verifyData.external_reference);
         }
 
         if (!reservationIdParam) {
           throw new Error('No se pudo determinar reservationId');
         }
 
-        // 4) Cargar la reserva pending que ya creaste antes de pagar
+        // 5) Cargar la reserva pending
         const resRef = doc(db, 'reservations', reservationIdParam);
         const resSnap = await getDoc(resRef);
         if (!resSnap.exists()) throw new Error('Reserva no encontrada');
 
         const resData = resSnap.data() as any;
 
-        // Idempotencia: si ya estaba confirmada, redirige directo
+        // 🔄 Idempotencia: si ya estaba confirmada, redirige directo
         if (resData.status === 'confirmed' && resData.paid === true) {
           router.replace(
             `/payment/confirmed?barName=${encodeURIComponent(resData.barName || '')}` +
@@ -101,7 +102,7 @@ export default function PaymentSuccess() {
           throw new Error('Reserva incompleta (barId/matchId/people faltan)');
         }
 
-        // 5) Mesas disponibles
+        // 6) Mesas disponibles
         const tablesSnap = await getDocs(collection(db, 'bars', barId, 'tables'));
         const allTables = tablesSnap.docs.map((d) => ({
           id: d.id,
@@ -127,7 +128,7 @@ export default function PaymentSuccess() {
         const freeTables = allTables.filter((t) => !reservedIds.has(t.id));
         freeTables.sort((a, b) => a.capacity - b.capacity);
 
-        // 6) Asignación de mesas
+        // 7) Asignación de mesas
         let assigned: string[] = [];
         const singleTable = freeTables.find((t) => t.capacity >= peopleCount);
         if (singleTable) {
@@ -145,7 +146,7 @@ export default function PaymentSuccess() {
           }
         }
 
-        // 7) Confirmar reserva
+        // 8) Confirmar reserva
         await updateDoc(resRef, {
           tableIds: assigned,
           paid: true,
@@ -154,7 +155,7 @@ export default function PaymentSuccess() {
           updatedAt: serverTimestamp(),
         });
 
-        // 8) Formatear fecha del partido
+        // 9) Formatear fecha del partido
         let matchDateFormatted = '';
         const matchSnap = await getDoc(doc(db, 'matches', matchId as string));
         if (matchSnap.exists()) {
@@ -172,7 +173,7 @@ export default function PaymentSuccess() {
           }
         }
 
-        // 9) Redirigir a confirmación
+        // 🔹 10) Redirigir a confirmación
         router.replace(
           `/payment/confirmed?barName=${encodeURIComponent(barName || '')}` +
             `&matchTeams=${encodeURIComponent(matchTeams || '')}` +
