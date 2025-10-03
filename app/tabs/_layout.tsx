@@ -60,7 +60,7 @@ export default function TabLayout() {
           options={{
             title: 'Mi cuenta',
             tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="person.crop.circle.fill" color={color} />
+              <IconSymbol size={28} name="person.fill" color={color} />
             ),
           }}
         />
