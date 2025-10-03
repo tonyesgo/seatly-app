@@ -41,7 +41,7 @@ export default function PaymentSuccess() {
       }
 
       try {
-        // 1) Intentar obtener reservationId del deep link
+        // 1) Obtener reservationId del deep link
         let reservationIdParam = String(reservationId || rid || '');
 
         // 2) Determinar paymentId (MP puede mandar collection_id/collection_status)
@@ -56,21 +56,29 @@ export default function PaymentSuccess() {
 
         // 3) Verificar en backend que el pago esté aprobado
         const verifyRes = await fetch(
-          `${DASHBOARD_BASE_URL}/api/verifyPayment?payment_id=${encodeURIComponent(maybePaymentId)}`
+          `${DASHBOARD_BASE_URL}/api/verifyPayment?payment_id=${encodeURIComponent(
+            maybePaymentId
+          )}`
         );
         const verifyData = await verifyRes.json();
 
         if (!verifyRes.ok) {
-          throw new Error(`Error verificando pago: ${JSON.stringify(verifyData)}`);
+          throw new Error(
+            `Error verificando pago: ${JSON.stringify(verifyData)}`
+          );
         }
 
         if (verifyData.status !== 'approved') {
           Alert.alert('Pago en proceso', 'Tu pago aún no está aprobado');
-          router.replace(`/payment/pending?reservationId=${encodeURIComponent(reservationIdParam || 'unknown')}`);
+          router.replace(
+            `/payment/pending?reservationId=${encodeURIComponent(
+              reservationIdParam || 'unknown'
+            )}`
+          );
           return;
         }
 
-        // 4) Si el deep link no traía reservationId, usar external_reference
+        // 4) Si no llegó reservationId, usar external_reference
         if (!reservationIdParam && verifyData.external_reference) {
           reservationIdParam = String(verifyData.external_reference);
         }
@@ -79,17 +87,19 @@ export default function PaymentSuccess() {
           throw new Error('No se pudo determinar reservationId');
         }
 
-        // 5) Cargar la reserva pending
+        // 5) Buscar la reserva
         const resRef = doc(db, 'reservations', reservationIdParam);
         const resSnap = await getDoc(resRef);
         if (!resSnap.exists()) throw new Error('Reserva no encontrada');
 
         const resData = resSnap.data() as any;
 
-        // 🔄 Idempotencia: si ya estaba confirmada, redirige directo
+        // 🔄 Idempotencia: si ya estaba confirmada, redirigir
         if (resData.status === 'confirmed' && resData.paid === true) {
           router.replace(
-            `/payment/confirmed?barName=${encodeURIComponent(resData.barName || '')}` +
+            `/payment/confirmed?barName=${encodeURIComponent(
+              resData.barName || ''
+            )}` +
               `&matchTeams=${encodeURIComponent(resData.matchTeams || '')}` +
               `&people=${encodeURIComponent(String(resData.people || 1))}`
           );
@@ -160,7 +170,8 @@ export default function PaymentSuccess() {
         const matchSnap = await getDoc(doc(db, 'matches', matchId as string));
         if (matchSnap.exists()) {
           const matchData = matchSnap.data() as any;
-          const rawDate = matchData?.date?.toDate?.() || new Date(matchData?.date);
+          const rawDate =
+            matchData?.date?.toDate?.() || new Date(matchData?.date);
           if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
             matchDateFormatted = rawDate.toLocaleString('es-MX', {
               weekday: 'long',
@@ -178,7 +189,9 @@ export default function PaymentSuccess() {
           `/payment/confirmed?barName=${encodeURIComponent(barName || '')}` +
             `&matchTeams=${encodeURIComponent(matchTeams || '')}` +
             `&people=${encodeURIComponent(String(peopleCount))}` +
-            (matchDateFormatted ? `&matchDate=${encodeURIComponent(matchDateFormatted)}` : '')
+            (matchDateFormatted
+              ? `&matchDate=${encodeURIComponent(matchDateFormatted)}`
+              : '')
         );
       } catch (error) {
         console.error('❌ Error en payment/success:', error);
