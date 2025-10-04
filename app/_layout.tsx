@@ -2,7 +2,7 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useRegisterPushToken } from '@/hooks/useNotifications';
 import { Stack } from 'expo-router';
-import Head from 'expo-router/head'; // 👈 importante para favicon y meta tags
+import Head from 'expo-router/head'; // ✅ tu versión correcta
 
 export default function Layout() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -21,8 +21,9 @@ export default function Layout() {
           content="Reserva tu mesa en los mejores bares para ver el partido con Seatly."
         />
         {/* 🟡 Favicon personalizado */}
-        <link rel="icon" href="/seatly-favicon.png" />
+        <link rel="icon" href="/seatly-favicon.png" type="image/png" />
         <link rel="apple-touch-icon" href="/seatly-favicon.png" />
+        <meta name="theme-color" content={theme.background} />
       </Head>
 
       <Stack
