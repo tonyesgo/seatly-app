@@ -27,7 +27,6 @@ import {
 
 const db = getFirestore(app);
 
-// --- Definición de tipo para markers del mapa web ---
 type BarMarker = {
   id: string;
   name: string;
@@ -155,7 +154,6 @@ export default function HomeScreen() {
     return results;
   };
 
-  // --- Deportes y ligas dinámicos ---
   const sportsFromMatches = useMemo(
     () => Array.from(new Set(matches.map((m) => m.sport))).filter(Boolean),
     [matches]
@@ -165,7 +163,6 @@ export default function HomeScreen() {
     Array.from(new Set(matches.filter((m) => m.sport === sport).map((m) => m.league)))
       .filter(Boolean);
 
-  // --- Municipios dinámicos ---
   const municipalitiesFromBars = useMemo(
     () =>
       Array.from(
@@ -222,8 +219,8 @@ export default function HomeScreen() {
       {/* 👇 Logo Seatly completo */}
       <View style={{ alignItems: "center", marginBottom: 20 }}>
         <Image
-          source={require("../../public/seatly-full.png")} // 👈 ajusta la ruta según tu estructura
-          style={{ width: 160, height: 80 }} // ajusta tamaño a tu gusto
+          source={require("../../public/seatly-full.png")}
+          style={{ width: 160, height: 80 }}
           resizeMode="contain"
         />
       </View>
@@ -232,13 +229,13 @@ export default function HomeScreen() {
         <TextInput
           style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
           placeholder="Buscar partido (ej. Tigres vs Rayados)"
-          placeholderTextColor="#999"
+          placeholderTextColor="#9D9C9E"
           value={search}
           onChangeText={setSearch}
         />
 
         {/* --- Filtros deportes --- */}
-        <Text style={styles.filterTitle}>FILTRAR POR DEPORTE</Text>
+        <Text style={[styles.filterTitle, { color: theme.text }]}>FILTRAR POR DEPORTE</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: "row", marginBottom: 10 }}>
             {sportsFromMatches.map((s) => (
@@ -247,13 +244,13 @@ export default function HomeScreen() {
                 style={[
                   styles.chip,
                   {
-                    backgroundColor: filterSport === s ? theme.tabBarActiveTintColor : "#F2F2F2",
-                    borderColor: filterSport === s ? theme.tabBarActiveTintColor : "#DDD",
+                    backgroundColor: filterSport === s ? theme.tabBarActiveTintColor : theme.cardBackground,
+                    borderColor: filterSport === s ? theme.tabBarActiveTintColor : theme.border,
                   },
                 ]}
                 onPress={() => { setFilterSport(filterSport === s ? null : s); setFilterLeague(null); }}
               >
-                <Text style={{ color: filterSport === s ? "#FFF" : "#333" }}>{s}</Text>
+                <Text style={{ color: filterSport === s ? theme.buttonText : theme.text }}>{s}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -262,7 +259,7 @@ export default function HomeScreen() {
         {/* --- Filtros liga --- */}
         {filterSport && (
           <>
-            <Text style={styles.filterTitle}>FILTRAR POR LIGA</Text>
+            <Text style={[styles.filterTitle, { color: theme.text }]}>FILTRAR POR LIGA</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: "row", marginBottom: 10 }}>
                 {leaguesFromMatches(filterSport).map((l) => (
@@ -271,13 +268,13 @@ export default function HomeScreen() {
                     style={[
                       styles.chip,
                       {
-                        backgroundColor: filterLeague === l ? theme.tabBarActiveTintColor : "#F2F2F2",
-                        borderColor: filterLeague === l ? theme.tabBarActiveTintColor : "#DDD",
+                        backgroundColor: filterLeague === l ? theme.tabBarActiveTintColor : theme.cardBackground,
+                        borderColor: filterLeague === l ? theme.tabBarActiveTintColor : theme.border,
                       },
                     ]}
                     onPress={() => setFilterLeague(filterLeague === l ? null : l)}
                   >
-                    <Text style={{ color: filterLeague === l ? "#FFF" : "#333" }}>{l}</Text>
+                    <Text style={{ color: filterLeague === l ? theme.buttonText : theme.text }}>{l}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -286,7 +283,7 @@ export default function HomeScreen() {
         )}
 
         {/* --- Filtros fecha --- */}
-        <Text style={styles.filterTitle}>FILTRAR POR FECHA</Text>
+        <Text style={[styles.filterTitle, { color: theme.text }]}>FILTRAR POR FECHA</Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 10 }}>
           {DATES.map((d) => (
             <TouchableOpacity
@@ -294,13 +291,13 @@ export default function HomeScreen() {
               style={[
                 styles.chip,
                 {
-                  backgroundColor: filterDate === d ? theme.tabBarActiveTintColor : "#F2F2F2",
-                  borderColor: filterDate === d ? theme.tabBarActiveTintColor : "#DDD",
+                  backgroundColor: filterDate === d ? theme.tabBarActiveTintColor : theme.cardBackground,
+                  borderColor: filterDate === d ? theme.tabBarActiveTintColor : theme.border,
                 },
               ]}
               onPress={() => setFilterDate(filterDate === d ? null : d)}
             >
-              <Text style={{ color: filterDate === d ? "#FFF" : "#333" }}>{d.toUpperCase()}</Text>
+              <Text style={{ color: filterDate === d ? theme.buttonText : theme.text }}>{d.toUpperCase()}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -320,14 +317,14 @@ export default function HomeScreen() {
               key={match.id}
               style={[
                 styles.card,
-                { backgroundColor: selectedMatch?.id === match.id ? '#dbeafe' : theme.tabBackground },
+                { backgroundColor: selectedMatch?.id === match.id ? '#dbeafe' : theme.cardBackground },
               ]}
               onPress={() => setSelectedMatch(match)}
             >
-              <Text style={styles.cardTitle}>{match.teams}</Text>
-              <Text style={styles.cardDate}>{readableDate}</Text>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>{match.teams}</Text>
+              <Text style={[styles.cardDate, { color: theme.secondaryText }]}>{readableDate}</Text>
               {(match.sport || match.league) && (
-                <Text style={{ fontSize: 13, color: "#999" }}>
+                <Text style={{ fontSize: 13, color: theme.secondaryText }}>
                   {match.sport} {match.league ? `· ${match.league}` : ""}
                 </Text>
               )}
@@ -338,9 +335,8 @@ export default function HomeScreen() {
         {/* --- Lista de bares + filtro municipio --- */}
         {selectedMatch && (
           <View style={styles.barsContainer}>
-            <Text style={styles.sectionTitle}>Bares que transmiten:</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Bares que transmiten:</Text>
 
-            {/* Filtro municipios */}
             {municipalitiesFromBars.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: "row", marginBottom: 10 }}>
@@ -348,13 +344,13 @@ export default function HomeScreen() {
                     style={[
                       styles.chip,
                       {
-                        backgroundColor: !filterMunicipality ? theme.tabBarActiveTintColor : "#F2F2F2",
-                        borderColor: !filterMunicipality ? theme.tabBarActiveTintColor : "#DDD",
+                        backgroundColor: !filterMunicipality ? theme.tabBarActiveTintColor : theme.cardBackground,
+                        borderColor: !filterMunicipality ? theme.tabBarActiveTintColor : theme.border,
                       },
                     ]}
                     onPress={() => setFilterMunicipality(null)}
                   >
-                    <Text style={{ color: !filterMunicipality ? "#FFF" : "#333" }}>Todos</Text>
+                    <Text style={{ color: !filterMunicipality ? theme.buttonText : theme.text }}>Todos</Text>
                   </TouchableOpacity>
                   {municipalitiesFromBars.map((m) => (
                     <TouchableOpacity
@@ -362,55 +358,68 @@ export default function HomeScreen() {
                       style={[
                         styles.chip,
                         {
-                          backgroundColor: filterMunicipality === m ? theme.tabBarActiveTintColor : "#F2F2F2",
-                          borderColor: filterMunicipality === m ? theme.tabBarActiveTintColor : "#DDD",
+                          backgroundColor: filterMunicipality === m ? theme.tabBarActiveTintColor : theme.cardBackground,
+                          borderColor: filterMunicipality === m ? theme.tabBarActiveTintColor : theme.border,
                         },
                       ]}
                       onPress={() => setFilterMunicipality(filterMunicipality === m ? null : m)}
                     >
-                      <Text style={{ color: filterMunicipality === m ? "#FFF" : "#333" }}>{m}</Text>
+                      <Text style={{ color: filterMunicipality === m ? theme.buttonText : theme.text }}>{m}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
             )}
 
-            <Text style={{ marginBottom: 10 }}>
+            <Text style={{ marginBottom: 10, color: theme.secondaryText }}>
               Mostrando {filteredBarsByMunicipality.length} bares
             </Text>
 
             {filteredBarsByMunicipality.map((bar) => (
-              <View key={bar.id} style={[styles.card, { backgroundColor: theme.tabBackground }]}>
-                <Text style={styles.cardTitle}>{bar.name}</Text>
-                <Text style={styles.cardDate}>{bar.location}</Text>
+              <View key={bar.id} style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>{bar.name}</Text>
+                <Text style={[styles.cardDate, { color: theme.secondaryText }]}>{bar.location}</Text>
                 {bar.promotion && (
                   <>
                     <Text style={{ marginTop: 4, color: '#D7A048' }}>
                       Promo: ${bar.promotion.price}
                     </Text>
                     {bar.promotion.included && (
-                      <Text style={{ fontSize: 12, color: '#666' }}>
+                      <Text style={{ fontSize: 12, color: theme.secondaryText }}>
                         {bar.promotion.included}
                       </Text>
                     )}
                   </>
                 )}
 
-                {/* Botones */}
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                   <TouchableOpacity
-                    style={{ flex: 0.6, paddingVertical: 10, borderRadius: 8, backgroundColor: '#EEE', alignItems: 'center' }}
+                    style={{
+                      flex: 0.6,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      backgroundColor: theme.cardBackground,
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                    }}
                     onPress={() => router.push(`/bar/${bar.id}?matchId=${selectedMatch.id}`)}
                   >
-                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: '#333' }}>
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: theme.text }}>
                       Más info
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: theme.tabBarActiveTintColor, alignItems: 'center' }}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 8,
+                      backgroundColor: theme.tabBarActiveTintColor,
+                      alignItems: 'center',
+                    }}
                     onPress={() => router.push(`/tabs/reserve?barId=${bar.id}&matchId=${selectedMatch.id}`)}
                   >
-                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.background }}>
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.buttonText }}>
                       Reservar
                     </Text>
                   </TouchableOpacity>
@@ -419,7 +428,7 @@ export default function HomeScreen() {
             ))}
 
             {/* --- Mapa --- */}
-            <Text style={styles.sectionTitle}>Mapa de bares</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Mapa de bares</Text>
             <MapView
               provider={PROVIDER_GOOGLE}
               style={{ width: '100%', height: 400, borderRadius: 10, marginBottom: 20 }}
@@ -444,9 +453,8 @@ export default function HomeScreen() {
                   location: bar.location,
                   icon: "/assets/images/icon.png",
                 }))}
-              onMarkerClick={(bar: BarMarker) => setSelectedBar(bar)} // 👈 corregido
+              onMarkerClick={(bar: BarMarker) => setSelectedBar(bar)}
             >
-              {/* Markers personalizados SOLO en móvil */}
               {filteredBarsByMunicipality.map((bar: any) => {
                 const lat = Number(bar.coordinates?.lat ?? bar.lat);
                 const lng = Number(bar.coordinates?.lng ?? bar.lng);
@@ -508,7 +516,7 @@ export default function HomeScreen() {
                       Promo: ${selectedBar.promotion.price}
                     </Text>
                     {selectedBar.promotion.included && (
-                      <Text style={{ fontSize: 13, color: '#666', marginBottom: 10, textAlign: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#9D9C9E', marginBottom: 10, textAlign: 'center' }}>
                         {selectedBar.promotion.included}
                       </Text>
                     )}
@@ -521,15 +529,17 @@ export default function HomeScreen() {
                       flex: 0.6,
                       paddingVertical: 10,
                       borderRadius: 8,
-                      backgroundColor: '#EEE',
+                      backgroundColor: theme.cardBackground,
                       alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: theme.border,
                     }}
                     onPress={() => {
                       setSelectedBar(null);
                       router.push(`/bar/${selectedBar.id}?matchId=${selectedMatch.id}`);
                     }}
                   >
-                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: '#333' }}>
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: theme.text }}>
                       Más info
                     </Text>
                   </TouchableOpacity>
@@ -546,14 +556,14 @@ export default function HomeScreen() {
                       router.push(`/tabs/reserve?barId=${selectedBar.id}&matchId=${selectedMatch.id}`);
                     }}
                   >
-                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.background }}>
+                    <Text style={{ fontFamily: 'Montserrat-ExtraBold', fontSize: 15, color: theme.buttonText }}>
                       Reservar
                     </Text>
                   </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity onPress={() => setSelectedBar(null)}>
-                  <Text style={{ marginTop: 10, color: '#666' }}>Cerrar</Text>
+                  <Text style={{ marginTop: 10, color: theme.secondaryText }}>Cerrar</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -570,7 +580,7 @@ const styles = StyleSheet.create({
   container: { padding: 10 },
   appTitle: { fontSize: 28, fontFamily: 'Montserrat-ExtraBold', marginBottom: 5, textAlign: 'center' },
   input: { padding: 10, borderRadius: 8, marginBottom: 20 },
-  filterTitle: { fontFamily: "Montserrat-ExtraBold", marginBottom: 6, marginTop: 12, color: "#555" },
+  filterTitle: { fontFamily: "Montserrat-ExtraBold", marginBottom: 6, marginTop: 12 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, marginBottom: 8, borderWidth: 1 },
   card: { padding: 15, borderRadius: 10, marginBottom: 12 },
   cardTitle: { fontSize: 16, fontFamily: 'Montserrat-Black' },
@@ -578,8 +588,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontFamily: 'Montserrat-ExtraBold', marginTop: 30, marginBottom: 8 },
   barsContainer: { marginTop: 10 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalCard: { width: '80%', padding: 20, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center' },
-  modalTitle: { fontFamily: 'Montserrat-Black', fontSize: 18, marginBottom: 6 },
-  modalSubtitle: { fontSize: 14, color: '#666', marginBottom: 10 },
+  modalCard: { width: '80%', padding: 20, borderRadius: 12, backgroundColor: '#1B1D36', alignItems: 'center' },
+  modalTitle: { fontFamily: 'Montserrat-Black', fontSize: 18, marginBottom: 6, color: '#FFF' },
+  modalSubtitle: { fontSize: 14, color: '#9D9C9E', marginBottom: 10 },
   modalPromo: { fontSize: 14, color: '#D7A048', marginBottom: 5 },
 });
