@@ -9,6 +9,8 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  orderBy,
+  query,
 } from 'firebase/firestore';
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -56,41 +58,44 @@ export default function HomeScreen() {
   const [selectedBar, setSelectedBar] = useState<any | null>(null);
 
   const fetchData = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const matchesSnap = await getDocs(collection(db, 'matches'));
-      const now = new Date();
+    // ✅ Consulta ordenada por fecha ascendente
+    const matchesQuery = query(collection(db, 'matches'), orderBy('date', 'asc'));
+    const matchesSnap = await getDocs(matchesQuery);
 
-      const matchesData = matchesSnap.docs
-        .map((doc) => {
-          const data = doc.data() as {
-            date?: any;
-            teams?: string;
-            sport?: string;
-            league?: string;
-          };
-          return { id: doc.id, ...data };
-        })
-        .filter((match) => {
-          const matchDate = match.date?.toDate?.();
-          return matchDate instanceof Date && matchDate >= now;
-        });
+    const now = new Date();
 
-      setMatches(matchesData);
+    const matchesData = matchesSnap.docs
+      .map((doc) => {
+        const data = doc.data() as {
+          date?: any;
+          teams?: string;
+          sport?: string;
+          league?: string;
+        };
+        return { id: doc.id, ...data };
+      })
+      .filter((match) => {
+        const matchDate = match.date?.toDate?.();
+        return matchDate instanceof Date && matchDate >= now;
+      });
 
-      const barsSnap = await getDocs(collection(db, 'bars'));
-      const barsData = barsSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setBars(barsData);
-    } catch (error) {
-      console.error('Error fetching data from Firebase:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setMatches(matchesData);
+
+    const barsSnap = await getDocs(collection(db, 'bars'));
+    const barsData = barsSnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    setBars(barsData);
+  } catch (error) {
+    console.error('Error fetching data from Firebase:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchData();
