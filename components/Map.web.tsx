@@ -1,4 +1,5 @@
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const PROVIDER_GOOGLE = 'google';
 
@@ -30,6 +31,35 @@ export default function MapWeb({
     googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
   });
 
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const [center, setCenter] = useState({ lat: latitude, lng: longitude });
+
+  const onLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    mapRef.current = null;
+  }, []);
+
+  // 🔹 Cuando cambian los markers, centramos el mapa automáticamente
+  useEffect(() => {
+    if (markers.length > 0 && mapRef.current) {
+      if (markers.length === 1) {
+        // Solo un marcador → centra directamente
+        const m = markers[0];
+        setCenter({ lat: m.lat, lng: m.lng });
+        mapRef.current.setZoom(16);
+        mapRef.current.panTo({ lat: m.lat, lng: m.lng });
+      } else {
+        // Varios marcadores → ajusta los límites del mapa
+        const bounds = new google.maps.LatLngBounds();
+        markers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
+        mapRef.current.fitBounds(bounds);
+      }
+    }
+  }, [markers]);
+
   if (!isLoaded) {
     return <p>Cargando mapa...</p>;
   }
@@ -41,8 +71,10 @@ export default function MapWeb({
         height: `${height}px`,
         borderRadius: '10px',
       }}
-      center={{ lat: latitude, lng: longitude }}
+      center={center}
       zoom={zoom}
+      onLoad={onLoad}
+      onUnmount={onUnmount}
     >
       {markers.map((m) => (
         <Marker
