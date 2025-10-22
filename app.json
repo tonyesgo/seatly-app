@@ -2,7 +2,7 @@
   "expo": {
     "name": "Seatly",
     "slug": "seatly",
-    "version": "1.0.6",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "seatly",
@@ -21,22 +21,28 @@
     },
 
     "android": {
-      "package": "com.tonyesgo.seatly",
-      "versionCode": 6,
-      "googleServicesFile": "./google-services.json",
-      "edgeToEdgeEnabled": true,
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "category": ["BROWSABLE", "DEFAULT"],
-          "data": [
-            { "scheme": "seatly", "host": "payment", "pathPrefix": "/success" },
-            { "scheme": "seatly", "host": "payment", "pathPrefix": "/failure" },
-            { "scheme": "seatly", "host": "payment", "pathPrefix": "/pending" }
-          ]
-        }
+  "package": "com.tonyesgo.seatly",
+  "versionCode": 10,
+  "googleServicesFile": "./google-services.json",
+  "edgeToEdgeEnabled": true,
+  "config": {
+    "googleMaps": {
+      "apiKey": "AIzaSyCMhug-KB03J6V3rpcvibnYsUnP7ENn1Pg"
+    }
+  },
+  "intentFilters": [
+    {
+      "action": "VIEW",
+      "category": ["BROWSABLE", "DEFAULT"],
+      "data": [
+        { "scheme": "seatly", "host": "payment", "pathPrefix": "/success" },
+        { "scheme": "seatly", "host": "payment", "pathPrefix": "/failure" },
+        { "scheme": "seatly", "host": "payment", "pathPrefix": "/pending" }
       ]
-    },
+    }
+  ]
+},
+
 
     "androidStatusBar": { "backgroundColor": "#030C27" },
 

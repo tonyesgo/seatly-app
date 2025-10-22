@@ -17,7 +17,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -35,6 +35,7 @@ const auth = getAuth(app);
 interface Table {
   id: string;
   capacity: number;
+  status?: string;
 }
 
 export default function ReserveScreen() {
@@ -52,14 +53,17 @@ export default function ReserveScreen() {
   const [name, setName] = useState('');
   const [people, setPeople] = useState('');
   const [phone, setPhone] = useState('');
-  const [currentReservations, setCurrentReservations] = useState(0);
 
   useLayoutEffect(() => {
     navigation.setOptions({
       title: 'Reservar mesa',
       headerBackVisible: true,
       headerBackTitle: 'Inicio',
-      headerStyle: { backgroundColor: theme.tabBackground, shadowColor: 'transparent', elevation: 0 },
+      headerStyle: {
+        backgroundColor: theme.tabBackground,
+        shadowColor: 'transparent',
+        elevation: 0,
+      },
       headerTitleStyle: { color: theme.text, fontWeight: 'bold' },
       headerTintColor: theme.text,
     });
@@ -94,64 +98,66 @@ export default function ReserveScreen() {
         const matchSnap = await getDoc(doc(db, 'matches', matchId as string));
         if (matchSnap.exists()) setMatch(matchSnap.data());
 
-        const promoSnap = await getDoc(doc(db, 'matches', matchId as string, 'promotions', barId as string));
-        setPromo(promoSnap.exists() ? promoSnap.data() : null);
-
-        const q = query(
-          collection(db, 'reservations'),
-          where('barId', '==', barId),
-          where('matchId', '==', matchId)
+        const promoSnap = await getDoc(
+          doc(db, 'matches', matchId as string, 'promotions', barId as string)
         );
-        const snapshot = await getDocs(q);
-        const total = snapshot.docs.reduce((sum, d) => sum + (d.data().people || 0), 0);
-        setCurrentReservations(total);
+        setPromo(promoSnap.exists() ? promoSnap.data() : null);
       }
     };
     fetchBarAndMatch();
   }, [barId, matchId]);
 
-  // 🔹 Verifica disponibilidad, pero NO asigna mesas aún
+  // 🔹 Verifica disponibilidad antes de ir a MercadoPago
   const checkAvailability = async (peopleCount: number): Promise<boolean> => {
     const matchDoc = await getDoc(doc(db, 'matches', matchId as string));
-    const matchData = matchDoc.exists() ? matchDoc.data() : null;
-    if (!matchData) return false;
+    if (!matchDoc.exists()) return false;
+    const matchData = matchDoc.data() as any;
 
     const broadcastBars: any[] = matchData.broadcastBars || [];
     const barConfig = broadcastBars.find((b) => b.barId === barId);
     if (!barConfig || !Array.isArray(barConfig.tableIds)) return false;
 
-    const tablesDisponibles = barConfig.tableIds;
+    const enabledTableIds: string[] = barConfig.tableIds;
 
-    const allTablesSnap = await getDocs(collection(db, 'bars', barId as string, 'tables'));
+    // 🔸 Traemos todas las mesas del bar
+    const allTablesSnap = await getDocs(
+      collection(db, 'bars', barId as string, 'tables')
+    );
     const allTables: Table[] = allTablesSnap.docs.map((d) => ({
       id: d.id,
       capacity: d.data().capacity,
+      status: d.data().status || 'active',
     }));
 
-    const availableTables = allTables.filter((t) => tablesDisponibles.includes(t.id));
+    // 🔸 Solo las habilitadas y activas
+    const availableTables = allTables.filter(
+      (t) => enabledTableIds.includes(t.id) && t.status !== 'inactive'
+    );
 
-    const resSnap = await getDocs(query(
-      collection(db, 'reservations'),
-      where('matchId', '==', matchId),
-      where('barId', '==', barId),
-      where('status', 'in', ['pending', 'confirmed']) // 🔹 tomamos en cuenta las reservas pendientes y confirmadas
-    ));
+    // 🔸 Excluimos las ya reservadas
+    const resSnap = await getDocs(
+      query(
+        collection(db, 'reservations'),
+        where('matchId', '==', matchId),
+        where('barId', '==', barId),
+        where('status', 'in', ['pending', 'confirmed'])
+      )
+    );
 
-    const reservedTableIds = resSnap.docs
-      .flatMap((d) => d.data().tableIds || []);
+    const reservedIds = new Set(
+      resSnap.docs.flatMap((d) => {
+        const data = d.data() as any;
+        return Array.isArray(data.tableIds) ? data.tableIds : [];
+      })
+    );
 
     const freeTables = availableTables
-      .filter((t) => !reservedTableIds.includes(t.id))
+      .filter((t) => !reservedIds.has(t.id))
       .sort((a, b) => a.capacity - b.capacity);
 
-    let remaining = peopleCount;
-
-    for (const table of freeTables) {
-      remaining -= table.capacity;
-      if (remaining <= 0) return true;
-    }
-
-    return false;
+    // ✅ Verificamos si hay una sola mesa con capacidad suficiente
+    const singleTable = freeTables.find((t) => t.capacity >= peopleCount);
+    return !!singleTable;
   };
 
   const handleReservation = async () => {
@@ -176,20 +182,23 @@ export default function ReserveScreen() {
       return;
     }
 
-    // 🔹 Paso extra: verificar disponibilidad antes de crear reserva
+    // 🔍 Paso extra: verificar disponibilidad antes de crear reserva
     const hasAvailability = await checkAvailability(peopleCount);
     if (!hasAvailability) {
-      Alert.alert('Capacidad excedida', 'Ya no hay suficientes mesas disponibles.');
+      Alert.alert(
+        'Sin disponibilidad',
+        'No hay ninguna mesa disponible con capacidad suficiente para tu grupo.'
+      );
       return;
     }
 
     const pricePerPerson = promo.price;
 
     try {
-      // 1) Generamos un id de reserva
+      // 1️⃣ Generamos un id de reserva
       const reservationId = doc(collection(db, 'reservations')).id;
 
-      // 2) Guardamos reserva PENDING en Firestore (sin tableIds aún)
+      // 2️⃣ Guardamos reserva como PENDING (sin mesas asignadas)
       await setDoc(doc(db, 'reservations', reservationId), {
         id: reservationId,
         status: 'pending',
@@ -209,7 +218,7 @@ export default function ReserveScreen() {
         source: 'app',
       });
 
-      // 3) Creamos preferencia en MP
+      // 3️⃣ Crear preferencia de pago en MercadoPago
       const paymentUrl = await createPreference({
         title: `Reserva en ${bar?.name ?? ''} - ${match?.teams ?? ''}`,
         userEmail: user.email || '',
@@ -220,10 +229,10 @@ export default function ReserveScreen() {
         reservationId,
       });
 
-      // 4) Redirigimos a MP
+      // 4️⃣ Redirigimos al flujo de pago
       if (paymentUrl) {
         if (Platform.OS === 'web') {
-          window.location.href = paymentUrl; 
+          window.location.href = paymentUrl;
         } else {
           router.push({
             pathname: '/payment/webview',
@@ -253,12 +262,19 @@ export default function ReserveScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.tabBackground }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
         <ScrollView contentContainerStyle={styles.container}>
           {bar && match && (
             <>
-              <Text style={[styles.title, { color: theme.text }]}>Reservar en {bar.name}</Text>
-              <Text style={[styles.subtitle, { color: theme.text }]}>Para ver: {match.teams}</Text>
+              <Text style={[styles.title, { color: theme.text }]}>
+                Reservar en {bar.name}
+              </Text>
+              <Text style={[styles.subtitle, { color: theme.text }]}>
+                Para ver: {match.teams}
+              </Text>
               <ThemedButton onPress={() => router.push(`/bar/${barId}`)}>
                 Más información del bar
               </ThemedButton>
@@ -272,23 +288,34 @@ export default function ReserveScreen() {
 
           {!user ? (
             <>
-              <Text style={[styles.subtitle, { color: theme.text, marginTop: 20 }]}>
+              <Text
+                style={[
+                  styles.subtitle,
+                  { color: theme.text, marginTop: 20 },
+                ]}
+              >
                 Debes iniciar sesión para continuar con tu reserva
               </Text>
               <ThemedButton
-                onPress={() =>
-                  router.push(
-                    `/login?redirectTo=${encodeURIComponent(`/reserve?barId=${barId}&matchId=${matchId}`)}`
-                  )
-                }
-              >
-                Iniciar sesión o registrarse
-              </ThemedButton>
+  onPress={() =>
+    router.push(
+      `/login?redirectTo=${encodeURIComponent(
+        `/tabs/reserve?barId=${barId}&matchId=${matchId}`
+      )}`
+    )
+  }
+>
+  Iniciar sesión o registrarse
+</ThemedButton>
+
             </>
           ) : (
             <>
               <TextInput
-                style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                style={[
+                  styles.input,
+                  { backgroundColor: theme.inputBackground, color: theme.text },
+                ]}
                 placeholder="Número de personas"
                 placeholderTextColor="#999"
                 value={people}
@@ -310,6 +337,15 @@ export default function ReserveScreen() {
 const styles = StyleSheet.create({
   container: { padding: 20, flexGrow: 1 },
   title: { fontSize: 22, fontFamily: 'Montserrat-Black', marginBottom: 4 },
-  subtitle: { fontSize: 16, fontFamily: 'Montserrat-ExtraBold', marginBottom: 10 },
-  input: { padding: 12, borderRadius: 8, marginBottom: 15, fontFamily: 'Montserrat-ExtraBold' },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Montserrat-ExtraBold',
+    marginBottom: 10,
+  },
+  input: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 15,
+    fontFamily: 'Montserrat-ExtraBold',
+  },
 });

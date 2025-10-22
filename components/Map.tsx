@@ -1,21 +1,12 @@
-// components/Map.tsx
 import { Platform } from 'react-native';
+import MapNative from './Map.native';
+import MapWeb from './Map.web';
 
-let MapView: any;
-let Marker: any;
-let PROVIDER_GOOGLE: any;
+const MapView = Platform.OS === 'web' ? MapWeb : MapNative;
 
-if (Platform.OS === 'web') {
-  const WebMap = require('./Map.web');
-  MapView = WebMap.default;
-  Marker = WebMap.Marker;
-  PROVIDER_GOOGLE = WebMap.PROVIDER_GOOGLE;
-} else {
-  const NativeMap = require('./Map.native');
-  MapView = NativeMap.default;
-  Marker = NativeMap.Marker;
-  PROVIDER_GOOGLE = NativeMap.PROVIDER_GOOGLE;
-}
+export const { Marker, PROVIDER_GOOGLE } =
+  Platform.OS === 'web'
+    ? MapWeb
+    : require('react-native-maps');
 
-export { Marker, PROVIDER_GOOGLE };
 export default MapView;

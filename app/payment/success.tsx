@@ -24,14 +24,8 @@ const DASHBOARD_BASE_URL = 'https://admin.seatlyapp.com';
 
 export default function PaymentSuccess() {
   const router = useRouter();
-
-  const {
-    reservationId,
-    rid,
-    payment_id,
-    collection_id,
-    collection_status,
-  } = useLocalSearchParams();
+  const { reservationId, rid, payment_id, collection_id, collection_status } =
+    useLocalSearchParams();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -41,10 +35,10 @@ export default function PaymentSuccess() {
       }
 
       try {
-        // 1) Obtener reservationId del deep link
+        // 1️⃣ Obtener reservationId del deep link
         let reservationIdParam = String(reservationId || rid || '');
 
-        // 2) Determinar paymentId (MP puede mandar collection_id/collection_status)
+        // 2️⃣ Determinar paymentId
         const maybePaymentId =
           (payment_id as string) ||
           (collection_status === 'approved' ? (collection_id as string) : '');
@@ -54,14 +48,13 @@ export default function PaymentSuccess() {
           return;
         }
 
-        // 3) Verificar en backend que el pago esté aprobado
+        // 3️⃣ Verificar en backend que el pago esté aprobado
         const verifyRes = await fetch(
           `${DASHBOARD_BASE_URL}/api/verifyPayment?payment_id=${encodeURIComponent(
             maybePaymentId
           )}`
         );
         const verifyData = await verifyRes.json();
-
         if (!verifyRes.ok) {
           throw new Error(
             `Error verificando pago: ${JSON.stringify(verifyData)}`
@@ -78,7 +71,7 @@ export default function PaymentSuccess() {
           return;
         }
 
-        // 4) Si no llegó reservationId, usar external_reference
+        // 4️⃣ Usar external_reference si no llegó reservationId
         if (!reservationIdParam && verifyData.external_reference) {
           reservationIdParam = String(verifyData.external_reference);
         }
@@ -87,14 +80,14 @@ export default function PaymentSuccess() {
           throw new Error('No se pudo determinar reservationId');
         }
 
-        // 5) Buscar la reserva
+        // 5️⃣ Buscar la reserva
         const resRef = doc(db, 'reservations', reservationIdParam);
         const resSnap = await getDoc(resRef);
         if (!resSnap.exists()) throw new Error('Reserva no encontrada');
 
         const resData = resSnap.data() as any;
 
-        // 🔄 Idempotencia: si ya estaba confirmada, redirigir
+        // 🔄 Idempotencia: si ya está confirmada, redirigir
         if (resData.status === 'confirmed' && resData.paid === true) {
           router.replace(
             `/payment/confirmed?barName=${encodeURIComponent(
@@ -112,13 +105,33 @@ export default function PaymentSuccess() {
           throw new Error('Reserva incompleta (barId/matchId/people faltan)');
         }
 
-        // 6) Mesas disponibles
+        // 6️⃣ Obtenemos la configuración del partido (para saber qué mesas están habilitadas)
+        const matchSnap = await getDoc(doc(db, 'matches', matchId as string));
+        if (!matchSnap.exists()) throw new Error('Partido no encontrado');
+        const matchData = matchSnap.data() as any;
+        const broadcastBars = matchData.broadcastBars || [];
+        const barConfig = broadcastBars.find((b: any) => b.barId === barId);
+
+        if (!barConfig || !Array.isArray(barConfig.tableIds)) {
+          throw new Error('El bar no tiene mesas habilitadas para este partido');
+        }
+
+        const enabledTableIds: string[] = barConfig.tableIds;
+
+        // 7️⃣ Obtenemos todas las mesas del bar
         const tablesSnap = await getDocs(collection(db, 'bars', barId, 'tables'));
         const allTables = tablesSnap.docs.map((d) => ({
           id: d.id,
           capacity: Number(d.data().capacity || 0),
+          status: d.data().status || 'active',
         }));
 
+        // 8️⃣ Filtramos solo las mesas habilitadas y activas
+        const availableTables = allTables.filter(
+          (t) => enabledTableIds.includes(t.id) && t.status !== 'inactive'
+        );
+
+        // 9️⃣ Excluimos las mesas ya reservadas (pending o confirmed)
         const resSameMatchBar = await getDocs(
           query(
             collection(db, 'reservations'),
@@ -135,28 +148,30 @@ export default function PaymentSuccess() {
           })
         );
 
-        const freeTables = allTables.filter((t) => !reservedIds.has(t.id));
-        freeTables.sort((a, b) => a.capacity - b.capacity);
+        const freeTables = availableTables
+          .filter((t) => !reservedIds.has(t.id))
+          .sort((a, b) => a.capacity - b.capacity);
 
-        // 7) Asignación de mesas
-        let assigned: string[] = [];
-        const singleTable = freeTables.find((t) => t.capacity >= peopleCount);
-        if (singleTable) {
-          assigned = [singleTable.id];
-        } else {
-          let remaining = peopleCount;
-          for (const t of freeTables) {
-            if (remaining <= 0) break;
-            assigned.push(t.id);
-            remaining -= t.capacity;
-          }
-          if (remaining > 0) {
-            Alert.alert('Error', 'No hay mesas suficientes para esta reserva');
-            return;
-          }
+        if (!freeTables.length) {
+          throw new Error('No hay mesas disponibles');
         }
 
-        // 8) Confirmar reserva
+        // 🔟 Asignación optimizada: mesa más pequeña donde quepan todos
+        const singleTable = freeTables
+          .filter((t) => t.capacity >= peopleCount)
+          .sort((a, b) => a.capacity - b.capacity)[0];
+
+        if (!singleTable) {
+          Alert.alert(
+            'Error',
+            'No hay ninguna mesa disponible que tenga capacidad suficiente.'
+          );
+          return;
+        }
+
+        const assigned = [singleTable.id];
+
+        // 1️⃣1️⃣ Confirmamos reserva
         await updateDoc(resRef, {
           tableIds: assigned,
           paid: true,
@@ -165,26 +180,21 @@ export default function PaymentSuccess() {
           updatedAt: serverTimestamp(),
         });
 
-        // 9) Formatear fecha del partido
+        // 1️⃣2️⃣ Formatear fecha del partido
         let matchDateFormatted = '';
-        const matchSnap = await getDoc(doc(db, 'matches', matchId as string));
-        if (matchSnap.exists()) {
-          const matchData = matchSnap.data() as any;
-          const rawDate =
-            matchData?.date?.toDate?.() || new Date(matchData?.date);
-          if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
-            matchDateFormatted = rawDate.toLocaleString('es-MX', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            });
-          }
+        const rawDate = matchData?.date?.toDate?.() || new Date(matchData?.date);
+        if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+          matchDateFormatted = rawDate.toLocaleString('es-MX', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
         }
 
-        // 🔹 10) Redirigir a confirmación
+        // 1️⃣3️⃣ Redirigir a confirmación
         router.replace(
           `/payment/confirmed?barName=${encodeURIComponent(barName || '')}` +
             `&matchTeams=${encodeURIComponent(matchTeams || '')}` +

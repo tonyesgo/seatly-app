@@ -1,14 +1,12 @@
 import { useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedButton } from '@/components/ui/ThemedButton';
 import { ThemedText } from '@/components/ui/ThemedText';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Image } from 'react-native';
-
 
 export default function UserPanelScreen() {
   const auth = getAuth();
@@ -30,14 +28,14 @@ export default function UserPanelScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.tabBackground }]}>
       <ScrollView contentContainerStyle={styles.container}>
+        {/* Logo */}
         <View style={{ alignItems: "center", marginBottom: 20 }}>
-                <Image
-                  source={require("../../public/seatly-full.png")} // 👈 ajusta la ruta según tu estructura
-                  style={{ width: 160, height: 80 }} // ajusta tamaño a tu gusto
-                  resizeMode="contain"
-                />
-              </View>
-
+          <Image
+            source={require("../../public/seatly-full.png")} // ajusta la ruta si cambias la carpeta
+            style={{ width: 160, height: 80 }}
+            resizeMode="contain"
+          />
+        </View>
 
         <ThemedText type="title" style={{ color: theme.text }}>Mi cuenta</ThemedText>
 
@@ -54,6 +52,11 @@ export default function UserPanelScreen() {
               Mis reservas
             </ThemedButton>
 
+            {/* 🔹 Nueva sección de Preguntas Frecuentes */}
+            <ThemedButton onPress={() => router.push('/tabs/faq')}>
+              Preguntas Frecuentes
+            </ThemedButton>
+
             <ThemedButton onPress={handleLogout} style={styles.logoutButton}>
               Cerrar sesión
             </ThemedButton>
@@ -67,8 +70,14 @@ export default function UserPanelScreen() {
             <ThemedButton onPress={() => router.push('/login')}>
               Iniciar sesión
             </ThemedButton>
+
             <ThemedButton onPress={() => router.push('/register')}>
               Crear cuenta
+            </ThemedButton>
+
+            {/* 🔹 También disponible aunque no haya sesión */}
+            <ThemedButton onPress={() => router.push('/tabs/faq')}>
+              Preguntas Frecuentes
             </ThemedButton>
           </>
         )}

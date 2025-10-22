@@ -1,5 +1,6 @@
-// components/Map.web.tsx
-import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+
+const PROVIDER_GOOGLE = 'google';
 
 type MarkerData = {
   id: string;
@@ -9,24 +10,24 @@ type MarkerData = {
 };
 
 type MapWebProps = {
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
   zoom?: number;
   height?: number;
   markers?: MarkerData[];
   onMarkerClick?: (marker: MarkerData) => void;
 };
 
-export default function MapView({
-  latitude,
-  longitude,
+export default function MapWeb({
+  latitude = 25.6866,
+  longitude = -100.3161,
   zoom = 15,
   height = 400,
   markers = [],
   onMarkerClick,
 }: MapWebProps) {
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
   });
 
   if (!isLoaded) {
@@ -36,28 +37,27 @@ export default function MapView({
   return (
     <GoogleMap
       mapContainerStyle={{
-        width: "100%",
+        width: '100%',
         height: `${height}px`,
-        borderRadius: "10px",
+        borderRadius: '10px',
       }}
       center={{ lat: latitude, lng: longitude }}
       zoom={zoom}
     >
       {markers.map((m) => (
         <Marker
-  key={m.id}
-  position={{ lat: m.lat, lng: m.lng }}
-  icon={{
-    url: "/seatly-marker.svg",
-    scaledSize: new google.maps.Size(50, 70),
-    anchor: new google.maps.Point(25, 70),
-  }}
-  onClick={() => onMarkerClick?.(m)}
-/>
-
-
-
+          key={m.id}
+          position={{ lat: m.lat, lng: m.lng }}
+          icon={{
+            url: '/seatly-marker.svg',
+            scaledSize: new google.maps.Size(50, 70),
+            anchor: new google.maps.Point(25, 70),
+          }}
+          onClick={() => onMarkerClick?.(m)}
+        />
       ))}
     </GoogleMap>
   );
 }
+
+export { Marker, PROVIDER_GOOGLE };

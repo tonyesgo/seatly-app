@@ -1,4 +1,5 @@
-import MapView, { Marker, PROVIDER_GOOGLE } from '@/components/Map';
+// app/tabs/index.tsx
+import MapView, { PROVIDER_GOOGLE } from '@/components/Map';
 import Colors from '@/constants/Colors';
 import { app } from '@/firebaseConfig';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -12,7 +13,7 @@ import {
   orderBy,
   query,
 } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Image,
   Modal,
@@ -58,44 +59,42 @@ export default function HomeScreen() {
   const [selectedBar, setSelectedBar] = useState<any | null>(null);
 
   const fetchData = async () => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // ✅ Consulta ordenada por fecha ascendente
-    const matchesQuery = query(collection(db, 'matches'), orderBy('date', 'asc'));
-    const matchesSnap = await getDocs(matchesQuery);
+      const matchesQuery = query(collection(db, 'matches'), orderBy('date', 'asc'));
+      const matchesSnap = await getDocs(matchesQuery);
+      const now = new Date();
 
-    const now = new Date();
+      const matchesData = matchesSnap.docs
+        .map((doc) => {
+          const data = doc.data() as {
+            date?: any;
+            teams?: string;
+            sport?: string;
+            league?: string;
+          };
+          return { id: doc.id, ...data };
+        })
+        .filter((match) => {
+          const matchDate = match.date?.toDate?.();
+          return matchDate instanceof Date && matchDate >= now;
+        });
 
-    const matchesData = matchesSnap.docs
-      .map((doc) => {
-        const data = doc.data() as {
-          date?: any;
-          teams?: string;
-          sport?: string;
-          league?: string;
-        };
-        return { id: doc.id, ...data };
-      })
-      .filter((match) => {
-        const matchDate = match.date?.toDate?.();
-        return matchDate instanceof Date && matchDate >= now;
-      });
+      setMatches(matchesData);
 
-    setMatches(matchesData);
-
-    const barsSnap = await getDocs(collection(db, 'bars'));
-    const barsData = barsSnap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    setBars(barsData);
-  } catch (error) {
-    console.error('Error fetching data from Firebase:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+      const barsSnap = await getDocs(collection(db, 'bars'));
+      const barsData = barsSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setBars(barsData);
+    } catch (error) {
+      console.error('Error fetching data from Firebase:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -214,21 +213,21 @@ export default function HomeScreen() {
   const DATES = ["hoy", "mañana", "fin", "7dias"];
 
   return (
-  <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled
-      contentContainerStyle={[styles.container, { paddingBottom: 20 }]}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
-    >
-      {/* 👇 Logo Seatly completo */}
-      <View style={{ alignItems: "center", marginBottom: 20 }}>
-        <Image
-          source={require("../../public/seatly-full.png")}
-          style={{ width: 160, height: 80 }}
-          resizeMode="contain"
-        />
-      </View>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        contentContainerStyle={[styles.container, { paddingBottom: 20 }]}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
+      >
+        {/* 👇 Logo Seatly completo */}
+        <View style={{ alignItems: "center", marginBottom: 20 }}>
+          <Image
+            source={require("../../public/seatly-full.png")}
+            style={{ width: 160, height: 80 }}
+            resizeMode="contain"
+          />
+        </View>
 
         {/* Buscador */}
         <TextInput
@@ -340,8 +339,9 @@ export default function HomeScreen() {
         {/* --- Lista de bares + filtro municipio --- */}
         {selectedMatch && (
           <View style={styles.barsContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Bares que transmiten:</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Restaurantes que transmiten:</Text>
 
+            {/* Filtro de municipios */}
             {municipalitiesFromBars.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: "row", marginBottom: 10 }}>
@@ -377,9 +377,10 @@ export default function HomeScreen() {
             )}
 
             <Text style={{ marginBottom: 10, color: theme.secondaryText }}>
-              Mostrando {filteredBarsByMunicipality.length} bares
+              Mostrando {filteredBarsByMunicipality.length} restaurantes
             </Text>
 
+            {/* --- Tarjetas de bares --- */}
             {filteredBarsByMunicipality.map((bar) => (
               <View key={bar.id} style={[styles.card, { backgroundColor: theme.cardBackground }]}>
                 <Text style={[styles.cardTitle, { color: theme.text }]}>{bar.name}</Text>
@@ -432,8 +433,8 @@ export default function HomeScreen() {
               </View>
             ))}
 
-            {/* --- Mapa --- */}
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Mapa de bares</Text>
+            {/* --- Mapa de bares --- */}
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Mapa de Restaurantes</Text>
             <MapView
               provider={PROVIDER_GOOGLE}
               style={{ width: '100%', height: 400, borderRadius: 10, marginBottom: 20 }}
@@ -443,10 +444,6 @@ export default function HomeScreen() {
                 latitudeDelta: 0.05,
                 longitudeDelta: 0.05,
               }}
-              latitude={Number(filteredBarsByMunicipality[0]?.coordinates?.lat ?? 25.6866)}
-              longitude={Number(filteredBarsByMunicipality[0]?.coordinates?.lng ?? -100.3161)}
-              zoom={14}
-              height={400}
               markers={filteredBarsByMunicipality
                 .filter((bar) => bar.coordinates?.lat && bar.coordinates?.lng)
                 .map((bar): BarMarker => ({
@@ -456,47 +453,9 @@ export default function HomeScreen() {
                   lng: Number(bar.coordinates.lng),
                   promotion: bar.promotion,
                   location: bar.location,
-                  icon: "/assets/images/icon.png",
                 }))}
               onMarkerClick={(bar: BarMarker) => setSelectedBar(bar)}
-            >
-              {filteredBarsByMunicipality.map((bar: any) => {
-                const lat = Number(bar.coordinates?.lat ?? bar.lat);
-                const lng = Number(bar.coordinates?.lng ?? bar.lng);
-                if (isNaN(lat) || isNaN(lng)) return null;
-
-                return (
-                  <Marker
-                    key={bar.id}
-                    coordinate={{ latitude: lat, longitude: lng }}
-                    anchor={{ x: 0.5, y: 1 }}
-                    onPress={() => setSelectedBar(bar)}
-                  >
-                    <View style={{ alignItems: "center" }}>
-                      <View
-                        style={{
-                          width: 50,
-                          height: 50,
-                          backgroundColor: "#1B1D36",
-                          borderRadius: 25,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          borderWidth: 2,
-                          borderColor: "#fff",
-                        }}
-                      >
-                        <Image
-                          source={require("@/assets/images/icon.png")}
-                          style={{ width: 28, height: 28 }}
-                          resizeMode="contain"
-                        />
-                      </View>
-                    </View>
-                  </Marker>
-                );
-              })}
-            </MapView>
-
+            />
           </View>
         )}
       </ScrollView>
@@ -575,7 +534,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }

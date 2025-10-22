@@ -10,6 +10,7 @@ const Colors = {
     buttonText: '#1B1D36', // texto oscuro sobre botón dorado
     inputBackground: '#ECEFF4', // input gris azulado claro
     icon: '#333',
+    tint: '#D7A048', // ✅ color de acento principal
 
     // 🔹 Nuevos tonos para consistencia visual
     cardBackground: '#FFFFFF', // tarjetas y modales claros
@@ -26,6 +27,7 @@ const Colors = {
     buttonText: '#1B1D36',
     inputBackground: '#2A2C44',
     icon: '#FFFFFF',
+    tint: '#D7A048', // ✅ color de acento principal
 
     // 🔹 Nuevos tonos para modo oscuro
     cardBackground: '#212322', // tarjetas en gris carbón

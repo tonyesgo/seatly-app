@@ -22,7 +22,7 @@ export default function PaymentConfirmed() {
         <ThemedText style={styles.label}>Fecha: {matchDate}</ThemedText>
       )}
 
-      <ThemedButton onPress={() => router.push('/myreservations')} style={styles.button}>
+      <ThemedButton onPress={() => router.push('/tabs/myreservations')} style={styles.button}>
   <ThemedText style={{ textAlign: 'center' }}>Ir a mis reservas</ThemedText>
 </ThemedButton>
 

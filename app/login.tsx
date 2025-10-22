@@ -23,7 +23,8 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 export default function LoginScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const { redirectTo } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const { redirectTo } = params;
 
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -45,18 +46,18 @@ export default function LoginScreen() {
   }, [navigation, theme]);
 
   const handleLogin = async () => {
-    console.log("👉 handleLogin ejecutado", { email, password });
+    console.log('👉 handleLogin ejecutado', { email, password });
 
     if (!email || !password) {
-      console.warn("⚠️ Falta correo o contraseña");
-      Alert.alert("Error", "Por favor ingresa correo y contraseña");
+      Alert.alert('Error', 'Por favor ingresa correo y contraseña');
       return;
     }
 
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-      console.log("✅ Login exitoso:", userCred.user.uid);
+      console.log('✅ Login exitoso:', userCred.user.uid);
 
+      // 🔹 Detectar ruta de retorno (si viene de reserva o registro)
       let safeRedirect: string | null = null;
 
       if (typeof redirectTo === 'string' && redirectTo.trim() !== '') {
@@ -67,16 +68,17 @@ export default function LoginScreen() {
         }
       }
 
+      // 🔹 Redirigir después de login
       if (safeRedirect) {
-        console.log("➡️ Redirigiendo a:", safeRedirect);
+        console.log('➡️ Redirigiendo a:', safeRedirect);
         router.replace(safeRedirect);
       } else {
-        console.log("➡️ Redirigiendo a /tabs/userpanel");
+        console.log('➡️ Redirigiendo a /tabs/userpanel');
         router.replace('/tabs/userpanel');
       }
     } catch (error: any) {
-      console.error("❌ Error de login:", error);
-      Alert.alert("Error", error.message);
+      console.error('❌ Error de login:', error);
+      Alert.alert('Error', 'Credenciales incorrectas o cuenta inexistente');
     }
   };
 
@@ -87,13 +89,10 @@ export default function LoginScreen() {
     }
     try {
       await sendPasswordResetEmail(auth, email);
-      Alert.alert(
-        'Correo enviado',
-        'Revisa tu bandeja de entrada para restablecer tu contraseña.'
-      );
+      Alert.alert('Correo enviado', 'Revisa tu bandeja de entrada para restablecer tu contraseña.');
     } catch (error: any) {
-      console.error("❌ Error reset password:", error);
-      Alert.alert("Error", error.message);
+      console.error('❌ Error reset password:', error);
+      Alert.alert('Error', error.message);
     }
   };
 
@@ -105,6 +104,7 @@ export default function LoginScreen() {
     }
   };
 
+  // 🔹 Versión web
   if (Platform.OS === 'web') {
     return (
       <ScrollView
@@ -146,6 +146,7 @@ export default function LoginScreen() {
     );
   }
 
+  // 🔹 Versión móvil (Android / iOS)
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: theme.background }}

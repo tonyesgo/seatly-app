@@ -1,7 +1,7 @@
 import { useFonts } from 'expo-font';
 import { Tabs } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Platform, View } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
@@ -68,6 +68,7 @@ export default function TabLayout() {
         {/* 👇 Ocultos pero con layout */}
         <Tabs.Screen name="reserve" options={{ href: null }} />
         <Tabs.Screen name="myreservations" options={{ href: null }} />
+         <Tabs.Screen name="faq" options={{ href: null }} />
       </Tabs>
     </View>
   );
