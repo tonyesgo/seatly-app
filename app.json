@@ -7,69 +7,94 @@
     "icon": "./assets/images/icon.png",
     "scheme": "seatly",
     "userInterfaceStyle": "automatic",
-
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#030C27"
     },
-
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.tonyesgo.seatly",
-      "buildNumber": "1.0.0"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.seatlyapp.seatly",
+      "buildNumber": "10",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "config": {
+        "googleMapsApiKey": "AIzaSyD0E3YRkHaiYEYm1HOjc2WJKLrPUxVfZQk"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Seatly necesita tu ubicación para encontrar restaurantes cercanos donde ver partidos deportivos",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Seatly necesita tu ubicación para mostrarte los mejores lugares cerca de ti",
+        "UIBackgroundModes": ["location"]
+      }
     },
-
     "android": {
-  "package": "com.tonyesgo.seatly",
-  "versionCode": 10,
-  "googleServicesFile": "./google-services.json",
-  "edgeToEdgeEnabled": true,
-  "config": {
-    "googleMaps": {
-      "apiKey": "AIzaSyCMhug-KB03J6V3rpcvibnYsUnP7ENn1Pg"
-    }
-  },
-  "intentFilters": [
-    {
-      "action": "VIEW",
-      "category": ["BROWSABLE", "DEFAULT"],
-      "data": [
-        { "scheme": "seatly", "host": "payment", "pathPrefix": "/success" },
-        { "scheme": "seatly", "host": "payment", "pathPrefix": "/failure" },
-        { "scheme": "seatly", "host": "payment", "pathPrefix": "/pending" }
+      "package": "com.seatlyapp",
+      "versionCode": 10,
+      "googleServicesFile": "./google-services.json",
+      "edgeToEdgeEnabled": true,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCMhug-KB03J6V3rpcvibnYsUnP7ENn1Pg"
+        }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            { "scheme": "seatly", "host": "payment", "pathPrefix": "/success" },
+            { "scheme": "seatly", "host": "payment", "pathPrefix": "/failure" },
+            { "scheme": "seatly", "host": "payment", "pathPrefix": "/pending" }
+          ]
+        }
       ]
-    }
-  ]
-},
-
-
-    "androidStatusBar": { "backgroundColor": "#030C27" },
-
-    "web": { "favicon": "./assets/images/favicon.png" },
-
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#030C27"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
+    },
     "plugins": [
       "expo-router",
       "expo-splash-screen",
       [
+        "expo-firebase-core",
+        {
+          "iosGoogleServicesFile": "./GoogleService-Info.plist",
+          "androidGoogleServicesFile": "./google-services.json"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Seatly necesita tu ubicación para encontrar restaurantes cercanos.",
+          "locationWhenInUsePermission": "Seatly necesita tu ubicación para encontrar restaurantes cercanos."
+        }
+      ],
+      [
         "expo-build-properties",
         {
-          "android": {
-            "kotlinVersion": "2.0.20"
+          "android": { "kotlinVersion": "2.0.20" },
+          "ios": { 
+            "useFrameworks": "dynamic", 
+            "flipper": false,
+            "deploymentTarget": "15.1"
           }
         }
       ]
     ],
-
-    "experiments": { "typedRoutes": false },
-
-    "extra": {
-      "eas": { "projectId": "e3dbe5b7-ad0c-42b1-a1de-5968dc5c840a" }
+    "experiments": {
+      "typedRoutes": false
     },
-
+    "extra": {
+      "eas": {
+        "projectId": "e3dbe5b7-ad0c-42b1-a1de-5968dc5c840a"
+      }
+    },
     "owner": "tonyesgo",
     "sdkVersion": "53.0.0",
     "platforms": ["ios", "android", "web"]
   }
 }
-

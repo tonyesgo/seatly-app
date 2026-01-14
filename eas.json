@@ -6,15 +6,31 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "autoIncrement": true
+      "ios": {
+        "simulator": false,
+        "resourceClass": "m-medium"
+      }
     },
     "production": {
       "distribution": "store",
       "autoIncrement": true,
+      "env": {
+        "EXPO_NO_CLEAN": "true"
+      },
+      "ios": {
+        "resourceClass": "m-medium",
+        "simulator": false
+      },
+      "cache": {
+        "key": "firebase-dynamic-frameworks"
+      },
       "android": {
         "gradleCommand": ":app:bundleRelease"
       }
@@ -22,8 +38,10 @@
   },
   "submit": {
     "production": {
-      "android": {
-        "track": "internal"
+      "ios": {
+        "appleId": "tu-apple-id@email.com",
+        "ascAppId": "id-de-tu-app-en-app-store-connect",
+        "appleTeamId": "tu-team-id"
       }
     }
   }
