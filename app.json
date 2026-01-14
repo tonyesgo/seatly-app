@@ -24,7 +24,9 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Seatly necesita tu ubicación para encontrar restaurantes cercanos donde ver partidos deportivos",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Seatly necesita tu ubicación para mostrarte los mejores lugares cerca de ti",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -40,11 +42,26 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["BROWSABLE", "DEFAULT"],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "data": [
-            { "scheme": "seatly", "host": "payment", "pathPrefix": "/success" },
-            { "scheme": "seatly", "host": "payment", "pathPrefix": "/failure" },
-            { "scheme": "seatly", "host": "payment", "pathPrefix": "/pending" }
+            {
+              "scheme": "seatly",
+              "host": "payment",
+              "pathPrefix": "/success"
+            },
+            {
+              "scheme": "seatly",
+              "host": "payment",
+              "pathPrefix": "/failure"
+            },
+            {
+              "scheme": "seatly",
+              "host": "payment",
+              "pathPrefix": "/pending"
+            }
           ]
         }
       ]
@@ -59,13 +76,7 @@
     "plugins": [
       "expo-router",
       "expo-splash-screen",
-      [
-        "expo-firebase-core",
-        {
-          "iosGoogleServicesFile": "./GoogleService-Info.plist",
-          "androidGoogleServicesFile": "./google-services.json"
-        }
-      ],
+      
       [
         "expo-location",
         {
@@ -76,14 +87,17 @@
       [
         "expo-build-properties",
         {
-          "android": { "kotlinVersion": "2.0.20" },
-          "ios": { 
-            "useFrameworks": "dynamic", 
+          "android": {
+            "kotlinVersion": "2.0.20"
+          },
+          "ios": {
+            "useFrameworks": "dynamic",
             "flipper": false,
             "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-maps"
     ],
     "experiments": {
       "typedRoutes": false
@@ -95,6 +109,10 @@
     },
     "owner": "tonyesgo",
     "sdkVersion": "53.0.0",
-    "platforms": ["ios", "android", "web"]
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ]
   }
 }
