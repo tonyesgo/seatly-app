@@ -2,7 +2,7 @@
   "expo": {
     "name": "Seatly",
     "slug": "seatly",
-    "version": "1.0.10",
+    "version": "1.0.12",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "seatly",
@@ -15,19 +15,17 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.seatlyapp",
-      "buildNumber": "10",
       "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
         "googleMapsApiKey": "AIzaSyD0E3YRkHaiYEYm1HOjc2WJKLrPUxVfZQk"
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "Seatly necesita tu ubicación para encontrar restaurantes cercanos donde ver partidos deportivos",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Seatly necesita tu ubicación para mostrarte los mejores lugares cerca de ti",
-        "UIBackgroundModes": [
-          "location"
-        ]
-      }
+  "ITSAppUsesNonExemptEncryption": false,
+  "NSLocationWhenInUseUsageDescription": "Seatly necesita tu ubicación para encontrar restaurantes cercanos donde ver partidos deportivos",
+  "NSLocationAlwaysAndWhenInUseUsageDescription": "Seatly necesita tu ubicación para mostrarte los mejores lugares cerca de ti",
+  "UIBackgroundModes": ["location"]
+}
+
     },
     "android": {
       "package": "com.seatlyapp",

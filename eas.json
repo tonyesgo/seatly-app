@@ -26,7 +26,8 @@
       },
       "ios": {
         "resourceClass": "m-medium",
-        "simulator": false
+        "simulator": false,
+        "credentialsSource": "remote"
       },
       "cache": {
         "key": "firebase-dynamic-frameworks"
